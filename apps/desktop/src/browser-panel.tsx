@@ -25,7 +25,7 @@ export function BrowserPanel({
   }, [panel.url]);
 
   return (
-    <aside className="browser-panel" data-testid="browser-panel">
+    <aside className={`browser-panel browser-panel--${panel.mode}`} data-testid="browser-panel">
       <div className="browser-panel__header">
         <div>
           <div className="chat-header__eyebrow">Browser companion</div>

@@ -3,9 +3,12 @@ import { expect, test } from "@playwright/test";
 import {
   createNamedThread,
   desktopShortcut,
+  getTimelineScrollMetrics,
+  jumpTimelineToBottom,
   launchDesktop,
   makeGitWorkspace,
   makeUserDataDir,
+  seedTranscriptMessages,
   selectSession,
 } from "../helpers/electron-app";
 
@@ -162,5 +165,37 @@ test("keeps browser auth state per workspace across relaunch", async () => {
   } finally {
     await harness.close();
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("restores composer focus and preserves bottom pinning when the browser companion closes", async () => {
+  test.setTimeout(30_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeGitWorkspace("browser-focus-workspace");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Browser focus test");
+    await seedTranscriptMessages(harness, window, { count: 12 });
+    await jumpTimelineToBottom(window);
+
+    const composer = window.getByTestId("composer");
+    await expect(composer).toBeFocused();
+
+    await window.getByRole("button", { name: "Toggle browser companion" }).click();
+    await expect(window.locator(".browser-panel")).toBeVisible();
+    await window.getByRole("button", { name: "Toggle browser companion" }).click();
+
+    await expect(window.locator(".browser-panel")).toHaveCount(0);
+    await expect(composer).toBeFocused();
+
+    const metrics = await getTimelineScrollMetrics(window);
+    expect(metrics.remainingFromBottom).toBeLessThan(32);
+  } finally {
+    await harness.close();
   }
 });

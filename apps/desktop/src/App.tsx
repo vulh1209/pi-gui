@@ -493,8 +493,22 @@ export default function App() {
     if (!api) {
       return;
     }
-    void updateSnapshot(api, setSnapshot, () => api.setBrowserPanelOpen(!showBrowserPanel));
-  }, [api, showBrowserPanel]);
+    const pane = timelinePaneRef.current;
+    const shouldPreserveBottom = pane ? isNearBottom(pane) || pinnedToBottomRef.current : pinnedToBottomRef.current;
+    if (shouldPreserveBottom) {
+      preserveBottomOnNextPaneResizeRef.current = true;
+    }
+
+    const nextOpen = !showBrowserPanel;
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserPanelOpen(nextOpen)).then(() => {
+      if (!nextOpen) {
+        focusComposer();
+      }
+      if (shouldPreserveBottom) {
+        schedulePinnedBottomRealignment(3);
+      }
+    });
+  }, [api, focusComposer, schedulePinnedBottomRealignment, showBrowserPanel]);
 
   const navigateBrowserPanel = useCallback((url: string) => {
     if (!api) {
