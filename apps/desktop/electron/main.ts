@@ -1,7 +1,8 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DesktopAppStore } from "./app-store";
@@ -61,6 +62,8 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set<string>(SUPPORTED_IMAGE_TYPES.map((ty
 const OPEN_FOLDER_MENU_ITEM_ID = "file.open-folder";
 const MAX_CLIPBOARD_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CLIPBOARD_IMAGE_DIMENSION = 8_192;
+const BROWSER_EXTENSION_PACKAGE_NAME = "@pi-gui/pi-browser-companion-extension";
+const BROWSER_EXTENSION_PACKAGE_SUFFIX = "/packages/pi-browser-companion-extension";
 const configuredUserDataDir = process.env.PI_APP_USER_DATA_DIR?.trim();
 
 if (configuredUserDataDir) {
@@ -89,50 +92,80 @@ function resolveBrowserExtensionPackagePath(): string {
   return path.resolve(process.cwd(), ...segments);
 }
 
-function resolveAgentDir(userDataDir: string): string {
+function resolveAgentDir(): string {
   const configuredAgentDir = process.env.PI_CODING_AGENT_DIR?.trim();
-  return configuredAgentDir ? path.resolve(configuredAgentDir) : path.join(app.getPath("home"), ".pi", "agent");
+  if (configuredAgentDir) {
+    if (configuredAgentDir === "~") {
+      return homedir();
+    }
+    if (configuredAgentDir.startsWith("~/")) {
+      return homedir() + configuredAgentDir.slice(1);
+    }
+    return configuredAgentDir;
+  }
+
+  return path.join(homedir(), ".pi", "agent");
 }
 
-async function ensureBrowserExtensionPackageConfigured(agentDir: string, packagePath: string): Promise<void> {
-  const settingsPath = path.join(agentDir, "settings.json");
-  const normalizedPackagePath = path.resolve(packagePath);
-  let root: Record<string, unknown> = {};
-  try {
-    const parsed = JSON.parse(await readFile(settingsPath, "utf8"));
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      root = { ...parsed } as Record<string, unknown>;
-    }
-  } catch {
-    root = {};
+function normalizePackageSourceForComparison(value: string): string {
+  return value.replace(/\\/g, "/").replace(/\/+$/g, "");
+}
+
+function isBrowserCompanionPackageSource(value: string, browserExtensionPackagePath: string): boolean {
+  if (value === BROWSER_EXTENSION_PACKAGE_NAME) {
+    return true;
   }
 
-  const existingPackages = Array.isArray(root.packages) ? [...root.packages] : [];
-  const retainedPackages = existingPackages.filter((entry) => {
-    const source = typeof entry === "string"
-      ? entry
-      : entry && typeof entry === "object" && typeof (entry as { source?: unknown }).source === "string"
-        ? (entry as { source: string }).source
-        : undefined;
-    if (!source || source.includes(":")) {
-      return true;
+  const normalized = normalizePackageSourceForComparison(value);
+  const normalizedBrowserExtensionPath = normalizePackageSourceForComparison(browserExtensionPackagePath);
+  return normalized === normalizedBrowserExtensionPath || normalized.endsWith(BROWSER_EXTENSION_PACKAGE_SUFFIX);
+}
+
+function isBrowserCompanionPackageEntry(entry: unknown, browserExtensionPackagePath: string): boolean {
+  if (typeof entry === "string") {
+    return isBrowserCompanionPackageSource(entry, browserExtensionPackagePath);
+  }
+
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return false;
+  }
+
+  const source = (entry as { source?: unknown }).source;
+  return typeof source === "string" && isBrowserCompanionPackageSource(source, browserExtensionPackagePath);
+}
+
+async function scrubBrowserCompanionFromAgentSettings(browserExtensionPackagePath: string): Promise<void> {
+  try {
+    const settingsPath = path.join(resolveAgentDir(), "settings.json");
+    const raw = await readFile(settingsPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return;
     }
 
-    const normalizedSource = path.resolve(source);
-    return normalizedSource !== normalizedPackagePath;
-  });
+    const root = { ...(parsed as Record<string, unknown>) };
+    const currentPackages = root.packages;
+    if (!Array.isArray(currentPackages)) {
+      return;
+    }
 
-  retainedPackages.push(normalizedPackagePath);
+    const nextPackages = currentPackages.filter(
+      (entry) => !isBrowserCompanionPackageEntry(entry, browserExtensionPackagePath),
+    );
+    if (nextPackages.length === currentPackages.length) {
+      return;
+    }
 
-  const previousSerialized = JSON.stringify(root.packages ?? []);
-  root.packages = retainedPackages;
-  const nextSerialized = JSON.stringify(retainedPackages);
-  if (previousSerialized === nextSerialized && existsSync(settingsPath)) {
+    if (nextPackages.length === 0) {
+      delete root.packages;
+    } else {
+      root.packages = nextPackages;
+    }
+
+    await writeFile(settingsPath, `${JSON.stringify(root, null, 2)}\n`, "utf8");
+  } catch {
     return;
   }
-
-  await mkdir(agentDir, { recursive: true });
-  await writeFile(settingsPath, `${JSON.stringify(root, null, 2)}\n`, "utf8");
 }
 
 function readClipboardImageAttachment(): ComposerImageAttachment | null {
@@ -326,9 +359,8 @@ app.setName("pi");
 
 app.whenReady().then(async () => {
   const userDataDir = process.env.PI_APP_USER_DATA_DIR?.trim() || app.getPath("userData");
-  const agentDir = resolveAgentDir(userDataDir);
   const browserExtensionPackagePath = resolveBrowserExtensionPackagePath();
-  await ensureBrowserExtensionPackageConfigured(agentDir, browserExtensionPackagePath);
+  await scrubBrowserCompanionFromAgentSettings(browserExtensionPackagePath);
   let generateThreadTitleOverride:
     | ((workspace: WorkspaceRef, options: GenerateThreadTitleOptions) => Promise<string | null | undefined>)
     | undefined;
@@ -351,6 +383,7 @@ app.whenReady().then(async () => {
   store = new DesktopAppStore({
     userDataDir,
     initialWorkspacePaths: resolveInitialWorkspacePaths(),
+    additionalExtensionPaths: [browserExtensionPackagePath],
     eventBus: agentEventBus,
     getWindow: () => mainWindow,
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
