@@ -634,10 +634,15 @@ async function executeBrowserActionSequence(
   });
 }
 
-function appendLocalActivity(store: AppStoreInternals, sessionRef: SessionRef, label: string): void {
+function appendLocalActivity(
+  store: AppStoreInternals,
+  sessionRef: SessionRef,
+  label: string,
+  detail?: string,
+): void {
   const key = sessionKey(sessionRef);
   const transcript = [...(store.sessionState.transcriptCache.get(key) ?? [])];
-  transcript.push(makeActivityItem(label));
+  transcript.push(makeActivityItem(label, detail ? { detail } : {}));
   store.sessionState.transcriptCache.set(key, transcript);
   store.persistTranscriptCacheForSession(sessionRef);
 }

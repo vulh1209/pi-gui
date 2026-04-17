@@ -298,6 +298,27 @@ app.whenReady().then(async () => {
   });
   const browserRuntimeExtension = createBrowserRuntimeExtension({
     getRoutingMode: () => store.state.browserWebTaskRoutingMode,
+    runBrowserActionSequence: async (context, actions) => {
+      const workspace = store.state.workspaces.find((entry) => entry.path === context.cwd);
+      if (!workspace) {
+        throw new Error(`No workspace is open for ${context.cwd}.`);
+      }
+      const session = workspace.sessions.find((entry) => entry.id === context.sessionId);
+      if (!session) {
+        throw new Error(`No active desktop session matches ${context.sessionId}.`);
+      }
+      const sessionRef = {
+        workspaceId: workspace.id,
+        sessionId: session.id,
+      };
+      for (const action of actions) {
+        await browserAutomationBridge.runForSession(sessionRef, action);
+      }
+    },
+    resolveContext: (ctx) => ({
+      cwd: ctx.cwd,
+      sessionId: ctx.sessionManager.getSessionId(),
+    }),
   });
   store = new DesktopAppStore({
     userDataDir,
