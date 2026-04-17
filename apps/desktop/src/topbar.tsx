@@ -1,6 +1,6 @@
 import type { MouseEvent as ReactMouseEvent, Dispatch, SetStateAction } from "react";
 import type { AppView, DesktopAppState, SessionRecord, WorkspaceRecord, WorktreeRecord } from "./desktop-state";
-import { DiffIcon, FolderIcon } from "./icons";
+import { BrowserIcon, DiffIcon, FolderIcon } from "./icons";
 import type { PiDesktopApi } from "./ipc";
 import type { WorkspaceMenuState } from "./hooks/use-workspace-menu";
 
@@ -22,7 +22,9 @@ interface TopbarProps {
     action: () => Promise<DesktopAppState>,
   ) => Promise<DesktopAppState>;
   readonly showDiffPanel: boolean;
+  readonly showBrowserPanel: boolean;
   readonly onToggleDiffPanel: () => void;
+  readonly onToggleBrowserPanel: () => void;
 }
 
 export function Topbar(props: TopbarProps) {
@@ -40,7 +42,9 @@ export function Topbar(props: TopbarProps) {
     setSnapshot,
     updateSnapshot,
     showDiffPanel,
+    showBrowserPanel,
     onToggleDiffPanel,
+    onToggleBrowserPanel,
   } = props;
 
   const handleDoubleClick = (event: ReactMouseEvent<HTMLElement>) => {
@@ -125,6 +129,14 @@ export function Topbar(props: TopbarProps) {
       </div>
 
       <div className="topbar__actions">
+        <button
+          aria-label="Toggle browser companion"
+          className={`icon-button topbar__icon ${showBrowserPanel ? "icon-button--active" : ""}`}
+          type="button"
+          onClick={onToggleBrowserPanel}
+        >
+          <BrowserIcon />
+        </button>
         <button
           aria-label="Toggle diff panel"
           className={`icon-button topbar__icon ${showDiffPanel ? "icon-button--active" : ""}`}

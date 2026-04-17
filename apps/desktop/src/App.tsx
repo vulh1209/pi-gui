@@ -16,6 +16,7 @@ import {
 } from "./desktop-state";
 import { formatRelativeTime } from "./string-utils";
 import { ComposerPanel } from "./composer-panel";
+import { BrowserPanel } from "./browser-panel";
 import { DiffPanel } from "./diff-panel";
 import { buildModelOptions } from "./composer-commands";
 import { parseTreeComposerCommand } from "./composer-commands";
@@ -358,6 +359,7 @@ export default function App() {
   const activeExtensionDialog = selectedExtensionUi?.pendingDialogs[0];
   const isSelectedExtensionDockExpanded = dockExpandedBySession[selectedSessionKey] ?? false;
   const persistedComposerDraft = snapshot?.composerDraft ?? "";
+  const showBrowserPanel = snapshot ? snapshot.browserPanel.mode !== "hidden" : false;
   const threadGroups = useMemo(
     () => (snapshot ? buildThreadGroups(snapshot) : []),
     [snapshot?.workspaces, snapshot?.worktreesByWorkspace, snapshot?.workspaceOrder],
@@ -482,6 +484,13 @@ export default function App() {
 
     schedulePinnedBottomRealignment(3);
   }, [schedulePinnedBottomRealignment]);
+
+  const toggleBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserPanelOpen(!showBrowserPanel));
+  }, [api, showBrowserPanel]);
 
   const openSettings = (workspaceId?: string, section?: SettingsSection) => {
     if (!api) {
@@ -1385,6 +1394,13 @@ export default function App() {
     void updateSnapshot(api, setSnapshot, () => api.setNotificationPreferences(preferences));
   };
 
+  const handleSetBrowserAutomationPolicy = (policy: import("./browser-panel-state").BrowserAutomationPolicy) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserAutomationPolicy(policy));
+  };
+
   const handleRequestNotificationPermission = () => {
     if (!api?.requestNotificationPermission) {
       return;
@@ -1627,12 +1643,14 @@ export default function App() {
           notificationPermissionStatus={notificationPermissionStatus}
           notificationPermissionPending={notificationPermissionPending}
           modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
+          browserAutomationPolicy={snapshot.browserAutomationPolicy}
           themeMode={themeMode}
           onLoginProvider={handleLoginProvider}
           onLogoutProvider={handleLogoutProvider}
           onSetProviderApiKey={handleSetProviderApiKey}
           onRemoveProviderApiKey={handleRemoveProviderApiKey}
           onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
+          onSetBrowserAutomationPolicy={handleSetBrowserAutomationPolicy}
           onSetDefaultModel={handleSetDefaultModel}
           onSetNotificationPreferences={handleSetNotificationPreferences}
           onRequestNotificationPermission={handleRequestNotificationPermission}
@@ -1760,7 +1778,9 @@ export default function App() {
           setSnapshot={setSnapshot}
           updateSnapshot={updateSnapshot}
           showDiffPanel={showDiffPanel}
+          showBrowserPanel={showBrowserPanel}
           onToggleDiffPanel={toggleDiffPanel}
+          onToggleBrowserPanel={toggleBrowserPanel}
         />
 
         {snapshot.activeView === "new-thread" ? (
@@ -1919,6 +1939,7 @@ export default function App() {
                 onNavigate={navigateTreeSelection}
               />
             ) : null}
+            {showBrowserPanel ? <BrowserPanel panel={snapshot.browserPanel} /> : null}
           </>
         ) : selectedWorkspace ? (
           <section className="canvas canvas--empty">

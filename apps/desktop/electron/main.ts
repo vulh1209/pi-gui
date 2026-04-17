@@ -15,6 +15,7 @@ import {
 } from "./notification-permission";
 import { initUpdateChecker } from "./update-checker";
 import { ThemeManager } from "./theme-manager";
+import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
 import { SUPPORTED_COMPOSER_IMAGE_TYPES } from "../src/composer-attachments";
@@ -343,6 +344,10 @@ app.whenReady().then(async () => {
     store.unarchiveSession(target),
   );
   ipcMain.handle(desktopIpc.setActiveView, (_event, activeView) => store.setActiveView(activeView));
+  ipcMain.handle(desktopIpc.setBrowserPanelOpen, (_event, open: boolean) => store.setBrowserPanelOpen(open));
+  ipcMain.handle(desktopIpc.setBrowserAutomationPolicy, (_event, policy: BrowserAutomationPolicy) =>
+    store.setBrowserAutomationPolicy(policy),
+  );
   ipcMain.handle(desktopIpc.refreshRuntime, (_event, workspaceId?: string) => store.refreshRuntime(workspaceId));
   ipcMain.handle(desktopIpc.setModelSettingsScopeMode, (_event, mode) => store.setModelSettingsScopeMode(mode));
   ipcMain.handle(desktopIpc.setSessionModel, (_event, workspaceId: string, sessionId: string, provider: string, modelId: string) =>

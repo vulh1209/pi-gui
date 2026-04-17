@@ -1,5 +1,10 @@
 import type { HostUiRequest, SessionConfig } from "@pi-gui/session-driver";
 import type { ModelSettingsSnapshot, RuntimeCommandRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import {
+  createHiddenBrowserPanelState,
+  type BrowserAutomationPolicy,
+  type BrowserPanelState,
+} from "./browser-panel-state";
 export type SessionStatus = "idle" | "running" | "failed";
 export type { SessionRole, TranscriptMessage } from "./timeline-types";
 import type { TranscriptMessage } from "./timeline-types";
@@ -152,6 +157,8 @@ export interface RemoveWorktreeInput {
 }
 
 export interface DesktopAppState {
+  readonly browserPanel: BrowserPanelState;
+  readonly browserAutomationPolicy: BrowserAutomationPolicy;
   readonly workspaces: readonly WorkspaceRecord[];
   readonly worktreesByWorkspace: Readonly<Record<string, readonly WorktreeRecord[]>>;
   readonly selectedWorkspaceId: string;
@@ -188,6 +195,8 @@ export interface WorkspaceSessionTarget {
 
 export function createEmptyDesktopAppState(): DesktopAppState {
   return {
+    browserPanel: createHiddenBrowserPanelState(),
+    browserAutomationPolicy: "ask-every-time",
     workspaces: [],
     worktreesByWorkspace: {},
     selectedWorkspaceId: "",

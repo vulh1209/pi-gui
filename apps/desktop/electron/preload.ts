@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { PRELOAD_DEV_RELOAD_MARKER } from "./dev-reload-preload-probe";
+import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import { desktopIpc, type DesktopNotificationPermissionStatus, type PiDesktopCommand } from "../src/ipc";
 import type {
   NavigateSessionTreeOptions,
@@ -131,6 +132,10 @@ contextBridge.exposeInMainWorld("piApp", {
   cancelCurrentRun: () => ipcRenderer.invoke(desktopIpc.cancelCurrentRun) as Promise<DesktopAppState>,
   setActiveView: (view: AppView) =>
     ipcRenderer.invoke(desktopIpc.setActiveView, view) as Promise<DesktopAppState>,
+  setBrowserPanelOpen: (open: boolean) =>
+    ipcRenderer.invoke(desktopIpc.setBrowserPanelOpen, open) as Promise<DesktopAppState>,
+  setBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) =>
+    ipcRenderer.invoke(desktopIpc.setBrowserAutomationPolicy, policy) as Promise<DesktopAppState>,
   refreshRuntime: (workspaceId?: string) =>
     ipcRenderer.invoke(desktopIpc.refreshRuntime, workspaceId) as Promise<DesktopAppState>,
   setModelSettingsScopeMode: (mode: "app-global" | "per-repo") =>

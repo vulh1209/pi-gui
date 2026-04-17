@@ -1,4 +1,5 @@
 import type { RuntimeSettingsSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
 import type {
   NavigateSessionTreeOptions,
   NavigateSessionTreeResult,
@@ -53,6 +54,8 @@ export const desktopIpc = {
   startThread: "pi-gui:start-thread",
   cancelCurrentRun: "pi-gui:cancel-current-run",
   setActiveView: "pi-gui:set-active-view",
+  setBrowserPanelOpen: "pi-gui:set-browser-panel-open",
+  setBrowserAutomationPolicy: "pi-gui:set-browser-automation-policy",
   refreshRuntime: "pi-gui:refresh-runtime",
   setModelSettingsScopeMode: "pi-gui:set-model-settings-scope-mode",
   setDefaultModel: "pi-gui:set-default-model",
@@ -163,6 +166,8 @@ export interface PiDesktopApi {
   startThread(input: StartThreadInput): Promise<DesktopAppState>;
   cancelCurrentRun(): Promise<DesktopAppState>;
   setActiveView(view: AppView): Promise<DesktopAppState>;
+  setBrowserPanelOpen(open: boolean): Promise<DesktopAppState>;
+  setBrowserAutomationPolicy(policy: BrowserAutomationPolicy): Promise<DesktopAppState>;
   refreshRuntime(workspaceId?: string): Promise<DesktopAppState>;
   setModelSettingsScopeMode(mode: ModelSettingsScopeMode): Promise<DesktopAppState>;
   setDefaultModel(workspaceId: string, provider: string, modelId: string): Promise<DesktopAppState>;

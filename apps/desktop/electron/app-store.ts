@@ -33,6 +33,7 @@ import type {
   RuntimeSettingsSnapshot,
   RuntimeSnapshot,
 } from "@pi-gui/session-driver/runtime-types";
+import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import {
   type AppView,
   type ComposerAttachment,
@@ -461,6 +462,33 @@ export class DesktopAppStore implements AppStoreInternals {
     return this.emit();
   }
 
+  async setBrowserPanelOpen(open: boolean): Promise<DesktopAppState> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserPanel: {
+        ...this.state.browserPanel,
+        mode: open ? "open" : "hidden",
+        workspaceId: open ? this.state.selectedWorkspaceId || undefined : this.state.browserPanel.workspaceId,
+      },
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    return this.emit();
+  }
+
+  async setBrowserAutomationPolicy(policy: BrowserAutomationPolicy): Promise<DesktopAppState> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserAutomationPolicy: policy,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
   async setModelSettingsScopeMode(modelSettingsScopeMode: ModelSettingsScopeMode): Promise<DesktopAppState> {
     await this.initialize();
     if (this.state.modelSettingsScopeMode === modelSettingsScopeMode) {
@@ -704,6 +732,7 @@ export class DesktopAppStore implements AppStoreInternals {
       this.state = {
         ...this.state,
         activeView: persisted.activeView ?? this.state.activeView,
+        browserAutomationPolicy: persisted.browserAutomationPolicy ?? this.state.browserAutomationPolicy,
         modelSettingsScopeMode: persisted.modelSettingsScopeMode ?? this.state.modelSettingsScopeMode,
         globalModelSettings: persisted.appGlobalModelSettings ?? this.state.globalModelSettings,
         notificationPreferences: {
@@ -1629,6 +1658,7 @@ export class DesktopAppStore implements AppStoreInternals {
       selectedWorkspaceId: this.state.selectedWorkspaceId || undefined,
       selectedSessionId: this.state.selectedSessionId || undefined,
       activeView: this.state.activeView,
+      browserAutomationPolicy: this.state.browserAutomationPolicy,
       composerDraft: this.state.composerDraft || undefined,
       composerDraftsBySession: mapToRecord(this.sessionState.composerDraftsBySession),
       extensionCommandCompatibilityByWorkspace: serializeCompatibilityByWorkspace(this.extensionCommandCompatibilityByWorkspace),

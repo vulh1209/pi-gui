@@ -4,6 +4,7 @@ import type {
   ModelSettingsScopeMode,
   NotificationPreferences,
 } from "../src/desktop-state";
+import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { ModelSettingsSnapshot } from "@pi-gui/session-driver/runtime-types";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
@@ -11,7 +12,7 @@ import { dirname } from "node:path";
 
 const uiStateWriteQueueByPath = new Map<string, Promise<void>>();
 export interface PersistedUiState {
-  readonly version?: 2 | 3 | 4 | 5 | 6 | 7;
+  readonly version?: 2 | 3 | 4 | 5 | 6 | 7 | 8;
   readonly selectedWorkspaceId?: string;
   readonly selectedSessionId?: string;
   readonly activeView?: AppView;
@@ -23,6 +24,7 @@ export interface PersistedUiState {
   readonly workspaceOrder?: readonly string[];
   readonly modelSettingsScopeMode?: ModelSettingsScopeMode;
   readonly appGlobalModelSettings?: ModelSettingsSnapshot;
+  readonly browserAutomationPolicy?: BrowserAutomationPolicy;
 }
 
 export interface LegacyPersistedUiState extends PersistedUiState {
@@ -36,10 +38,12 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
     const parsed = JSON.parse(raw) as LegacyPersistedUiState;
     return {
       version:
-        parsed.version === 6
-          ? 6
+        parsed.version === 8
+          ? 8
           : parsed.version === 7
             ? 7
+          : parsed.version === 6
+          ? 6
           : parsed.version === 5
             ? 5
             : parsed.version === 4
@@ -63,6 +67,12 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
           ? parsed.modelSettingsScopeMode
           : undefined,
       appGlobalModelSettings: toPersistedModelSettingsSnapshot(parsed.appGlobalModelSettings),
+      browserAutomationPolicy:
+        parsed.browserAutomationPolicy === "ask-every-time" ||
+        parsed.browserAutomationPolicy === "allow-navigation-read" ||
+        parsed.browserAutomationPolicy === "allow-full-automation"
+          ? parsed.browserAutomationPolicy
+          : undefined,
       composerAttachmentsBySession: parsed.composerAttachmentsBySession,
       transcripts: parsed.transcripts,
     };
@@ -79,7 +89,7 @@ export async function writePersistedUiState(
     await mkdir(dirname(uiStateFilePath), { recursive: true });
     const serialized = `${JSON.stringify(
       {
-        version: 7,
+        version: 8,
         ...payload,
       } satisfies PersistedUiState,
       null,

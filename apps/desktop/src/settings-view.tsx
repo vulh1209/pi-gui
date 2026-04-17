@@ -1,4 +1,5 @@
 import type { RuntimeSettingsSnapshot, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
 import type { ModelSettingsScopeMode, NotificationPreferences, WorkspaceRecord } from "./desktop-state";
 import type { DesktopNotificationPermissionStatus } from "./ipc";
 import { SettingsAppearanceSection } from "./settings-appearance-section";
@@ -18,8 +19,10 @@ interface SettingsViewProps {
   readonly notificationPermissionStatus: DesktopNotificationPermissionStatus;
   readonly notificationPermissionPending: boolean;
   readonly modelSettingsScopeMode: ModelSettingsScopeMode;
+  readonly browserAutomationPolicy: BrowserAutomationPolicy;
   readonly themeMode: "system" | "light" | "dark";
   readonly onSetModelSettingsScopeMode: (mode: ModelSettingsScopeMode) => void;
+  readonly onSetBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) => void;
   readonly onSetDefaultModel: (provider: string, modelId: string) => void;
   readonly onSetThinkingLevel: (thinkingLevel: RuntimeSettingsSnapshot["defaultThinkingLevel"]) => void;
   readonly onToggleSkillCommands: (enabled: boolean) => void;
@@ -42,8 +45,10 @@ export function SettingsView({
   notificationPermissionStatus,
   notificationPermissionPending,
   modelSettingsScopeMode,
+  browserAutomationPolicy,
   themeMode,
   onSetModelSettingsScopeMode,
+  onSetBrowserAutomationPolicy,
   onSetDefaultModel,
   onSetThinkingLevel,
   onToggleSkillCommands,
@@ -94,7 +99,9 @@ export function SettingsView({
             <SettingsGeneralSection
               runtime={runtime}
               modelSettingsScopeMode={modelSettingsScopeMode}
+              browserAutomationPolicy={browserAutomationPolicy}
               onSetModelSettingsScopeMode={onSetModelSettingsScopeMode}
+              onSetBrowserAutomationPolicy={onSetBrowserAutomationPolicy}
               onToggleSkillCommands={onToggleSkillCommands}
             />
           ) : null}

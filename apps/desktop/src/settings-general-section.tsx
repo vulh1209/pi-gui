@@ -1,18 +1,23 @@
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
 import type { ModelSettingsScopeMode } from "./desktop-state";
 import { SettingsGroup, SettingsInfoRow, SettingsRow } from "./settings-utils";
 
 interface SettingsGeneralSectionProps {
   readonly runtime?: RuntimeSnapshot;
   readonly modelSettingsScopeMode: ModelSettingsScopeMode;
+  readonly browserAutomationPolicy: BrowserAutomationPolicy;
   readonly onSetModelSettingsScopeMode: (mode: ModelSettingsScopeMode) => void;
+  readonly onSetBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) => void;
   readonly onToggleSkillCommands: (enabled: boolean) => void;
 }
 
 export function SettingsGeneralSection({
   runtime,
   modelSettingsScopeMode,
+  browserAutomationPolicy,
   onSetModelSettingsScopeMode,
+  onSetBrowserAutomationPolicy,
   onToggleSkillCommands,
 }: SettingsGeneralSectionProps) {
   const connectedCount = runtime?.providers.filter((p) => p.hasAuth).length ?? 0;
@@ -52,6 +57,37 @@ export function SettingsGeneralSection({
             type="checkbox"
             onChange={(event) => onToggleSkillCommands(event.target.checked)}
           />
+        </SettingsRow>
+        <SettingsRow
+          title="Browser automation"
+          description="Choose how aggressively agents may act inside the browser companion."
+        >
+          <div className="settings-pill-row">
+            <button
+              className={`settings-pill${browserAutomationPolicy === "ask-every-time" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserAutomationPolicy === "ask-every-time"}
+              onClick={() => onSetBrowserAutomationPolicy("ask-every-time")}
+            >
+              Ask every time
+            </button>
+            <button
+              className={`settings-pill${browserAutomationPolicy === "allow-navigation-read" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserAutomationPolicy === "allow-navigation-read"}
+              onClick={() => onSetBrowserAutomationPolicy("allow-navigation-read")}
+            >
+              Allow navigation/read
+            </button>
+            <button
+              className={`settings-pill${browserAutomationPolicy === "allow-full-automation" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserAutomationPolicy === "allow-full-automation"}
+              onClick={() => onSetBrowserAutomationPolicy("allow-full-automation")}
+            >
+              Allow full automation
+            </button>
+          </div>
         </SettingsRow>
       </SettingsGroup>
 
