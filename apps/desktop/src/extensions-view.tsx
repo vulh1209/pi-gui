@@ -88,6 +88,24 @@ export function ExtensionsView({
     }
   }, [expandedGroupId, packageGroups, selectedGroupId]);
 
+  useEffect(() => {
+    if (!activeGroup) {
+      return;
+    }
+
+    const selectedInActiveGroup = selectedExtension
+      ? activeGroup.extensions.some((extension) => extension.path === selectedExtension.path)
+      : false;
+    if (selectedInActiveGroup) {
+      return;
+    }
+
+    const nextSelectedExtension = activeGroup.extensions[0];
+    if (nextSelectedExtension && nextSelectedExtension.path !== selectedExtensionPath) {
+      setSelectedExtensionPath(nextSelectedExtension.path);
+    }
+  }, [activeGroup, selectedExtension, selectedExtensionPath]);
+
   const selectedCompatibilityRecords = useMemo(
     () =>
       selectedExtension
@@ -160,8 +178,12 @@ export function ExtensionsView({
                       type="button"
                       onClick={() => {
                         setExpandedGroupId((current) => (current === group.id ? undefined : group.id));
-                        if (!selectedExtension && group.extensions[0]) {
-                          setSelectedExtensionPath(group.extensions[0].path);
+                        const selectedInGroup = selectedExtension
+                          ? group.extensions.some((extension) => extension.path === selectedExtension.path)
+                          : false;
+                        const nextSelectedExtension = selectedInGroup ? selectedExtension : group.extensions[0];
+                        if (nextSelectedExtension && nextSelectedExtension.path !== selectedExtensionPath) {
+                          setSelectedExtensionPath(nextSelectedExtension.path);
                         }
                       }}
                     >
