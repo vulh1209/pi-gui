@@ -9,6 +9,7 @@ import {
   launchDesktop,
   makeUserDataDir,
   makeWorkspace,
+  selectSession,
 } from "../helpers/electron-app";
 import { createThread, selectSessionByTitle, setSessionVisibilityOverride, type SessionContext } from "./session-event-test-helpers";
 
@@ -44,6 +45,7 @@ async function emitRunCompleted(
   runId: string,
 ): Promise<void> {
   const timestamp = new Date().toISOString();
+  const completedAt = new Date().toISOString();
   const delta: Extract<SessionDriverEvent, { type: "assistantDelta" }> = {
     type: "assistantDelta",
     sessionRef: session.sessionRef,
@@ -56,14 +58,14 @@ async function emitRunCompleted(
   const completion: Extract<SessionDriverEvent, { type: "runCompleted" }> = {
     type: "runCompleted",
     sessionRef: session.sessionRef,
-    timestamp: new Date(Date.now() + 1_000).toISOString(),
+    timestamp: completedAt,
     runId,
     snapshot: {
       ref: session.sessionRef,
       workspace: session.workspace,
       title: session.title,
       status: "idle",
-      updatedAt: new Date(Date.now() + 1_000).toISOString(),
+      updatedAt: completedAt,
       preview: `${label} complete`,
     },
   };

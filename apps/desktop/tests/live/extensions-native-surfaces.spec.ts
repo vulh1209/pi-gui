@@ -93,7 +93,8 @@ test("keeps pi-mode out of chat by default and shows it again after a global cha
 
     const detail = window.locator(".skill-detail");
     await expect(detail).toContainText("/pi-mode");
-    await detail.getByRole("button", { name: "Chat", exact: true }).click();
+    const piModeCommand = detail.locator(".skill-detail__meta-label", { hasText: "/pi-mode" }).locator("xpath=..");
+    await piModeCommand.getByRole("button", { name: "Chat", exact: true }).click();
 
     await expect
       .poll(() => readPiModeVisibilityOverride(window), { timeout: 30_000 })

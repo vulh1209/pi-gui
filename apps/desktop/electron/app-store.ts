@@ -1131,7 +1131,10 @@ export class DesktopAppStore implements AppStoreInternals {
     }
 
     this.sessionState.loadedTranscriptKeys.add(key);
-    this.sessionState.transcriptCache.set(key, transcript);
+    this.sessionState.transcriptCache.set(
+      key,
+      mergeLoadedTranscriptWithRuntimeItems(transcript, this.sessionState.transcriptCache.get(key) ?? []),
+    );
   }
 
   async reloadTranscriptFromDriver(sessionRef: SessionRef): Promise<void> {
@@ -2331,6 +2334,47 @@ export class DesktopAppStore implements AppStoreInternals {
     this.sessionState.pendingAutoTitleBySession.delete(key);
     pendingAutoTitle.cancel();
   }
+}
+
+function mergeLoadedTranscriptWithRuntimeItems(
+  loadedTranscript: readonly TranscriptMessage[],
+  existingTranscript: readonly TranscriptMessage[],
+): TranscriptMessage[] {
+  if (existingTranscript.length === 0) {
+    return [...loadedTranscript];
+  }
+
+  const merged = [...loadedTranscript];
+  const seenKeys = new Set(loadedTranscript.map(transcriptMergeKey));
+
+  for (const item of existingTranscript) {
+    if (item.kind === "message") {
+      continue;
+    }
+
+    const key = transcriptMergeKey(item);
+    if (seenKeys.has(key)) {
+      continue;
+    }
+
+    seenKeys.add(key);
+    merged.push(item);
+  }
+
+  return merged;
+}
+
+function transcriptMergeKey(item: TranscriptMessage): string {
+  if (item.kind === "message") {
+    return `message:${item.id}`;
+  }
+  if (item.kind === "tool") {
+    return `tool:${item.callId}:${item.status}:${item.label}:${item.detail ?? ""}`;
+  }
+  if (item.kind === "summary") {
+    return `summary:${item.presentation}:${item.label}:${item.metadata ?? ""}`;
+  }
+  return `activity:${item.label}:${item.detail ?? ""}:${item.metadata ?? ""}:${item.tone ?? "neutral"}`;
 }
 
 /* ── Module-private free functions ───────────────────────── */

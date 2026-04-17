@@ -6,6 +6,7 @@ import {
   createNamedThread,
   emitTestSessionEvent,
   getDesktopState,
+  getRealAuthConfig,
   launchDesktop,
   makeUserDataDir,
   makeWorkspace,
@@ -192,6 +193,9 @@ test("logs a completion notification and blue dot for a selected session after t
 
 test("logs a completion notification and blue dot when an existing session completes after the user switches away", async () => {
   test.setTimeout(180_000);
+  const realAuth = getRealAuthConfig();
+  test.skip(!realAuth.enabled, realAuth.skipReason);
+
   const userDataDir = await makeUserDataDir();
   const notificationLogPath = join(userDataDir, "notifications-existing-session.jsonl");
   const workspacePath = await makeWorkspace("notifications-existing-session-workspace");
@@ -199,6 +203,7 @@ test("logs a completion notification and blue dot when an existing session compl
     initialWorkspaces: [workspacePath],
     notificationLogPath,
     testMode: "foreground",
+    realAuthSourceDir: realAuth.sourceDir,
   });
 
   try {
