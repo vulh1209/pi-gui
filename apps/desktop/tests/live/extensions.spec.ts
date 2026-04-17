@@ -121,7 +121,7 @@ test("manages extensions and prefers runtime commands over colliding host action
     await expect(window.locator(".skill-detail")).toContainText("prefill-demo");
 
     await window.getByRole("button", { name: "Disable", exact: true }).click();
-    await expect(window.locator(".skill-detail__status")).toHaveText("Disabled");
+    await expect(extensionCard).toContainText("Disabled");
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
     await expect(window.locator(".topbar__session")).toHaveText("Inspect extension surface");
     await expect(window.getByTestId("extension-dock")).toHaveCount(0);
@@ -133,7 +133,7 @@ test("manages extensions and prefers runtime commands over colliding host action
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
     await extensionCard.click();
     await window.getByRole("button", { name: "Enable", exact: true }).click();
-    await expect(window.locator(".skill-detail__status")).toHaveText("Enabled");
+    await expect(extensionCard).toContainText("Enabled");
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
     await expect(window.locator(".topbar__session")).toHaveText("Extension Surface");
     await expect(window.getByTestId("extension-dock-summary")).toHaveText("Demo ready");
