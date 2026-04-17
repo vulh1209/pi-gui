@@ -10,13 +10,17 @@ export interface NpmCommandRecoveryFailure {
   readonly configuredCommand?: readonly string[];
 }
 
-export function formatNpmRecoveryWarning(workspacePath: string, failure: NpmCommandRecoveryFailure): string {
+export function formatNpmRecoveryWarning(
+  contextLabel: string,
+  workspacePath: string,
+  failure: NpmCommandRecoveryFailure,
+): string {
   const configured = failure.configuredCommand ? failure.configuredCommand.join(" ") : "<none>";
   const attempted = failure.attemptedCommands
     .map((attempt) => `${attempt.command.join(" ")} => ${attempt.error}`)
     .join("; ");
   return (
-    `[pi-gui] Falling back to runtime resource loading without npm package sources for ${workspacePath}. ` +
+    `[pi-gui] Falling back to ${contextLabel} without npm package sources for ${workspacePath}. ` +
     `Configured npmCommand: ${configured}. Attempted commands: ${attempted || "<none>"}. ` +
     `Set npmCommand in settings.json if automatic recovery still fails.`
   );
