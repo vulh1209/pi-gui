@@ -4,18 +4,40 @@ import { MessageMarkdown } from "./message-markdown";
 import { InlineDiff, extractDiffFromOutput } from "./diff-inline";
 import { ChevronRightIcon, CopyIcon, FileIcon } from "./icons";
 
+const STRUCTURED_USER_BRIEF_KEYWORDS = [
+  "file plan",
+  "prompt ready-to-paste",
+  "worktree phải dùng",
+  "branch hiện tại",
+  "lưu ý quan trọng",
+  "đã chuẩn bị prompt tại",
+  "session chat khác phải chạy",
+  "critical execution rules",
+  "first read these files",
+] as const;
+
 export function TimelineItem({
   item,
   expandedToolCallIds,
+  expandedStructuredMessageIds,
   onToggleToolCall,
+  onToggleStructuredMessage,
 }: {
   readonly item: TranscriptMessage;
   readonly expandedToolCallIds?: ReadonlySet<string>;
+  readonly expandedStructuredMessageIds?: ReadonlySet<string>;
   readonly onToggleToolCall?: (callId: string) => void;
+  readonly onToggleStructuredMessage?: (messageId: string) => void;
 }) {
   switch (item.kind) {
     case "message":
-      return <TimelineMessage item={item} />;
+      return (
+        <TimelineMessage
+          item={item}
+          expandedStructuredMessageIds={expandedStructuredMessageIds}
+          onToggleStructuredMessage={onToggleStructuredMessage}
+        />
+      );
     case "activity":
       return <TimelineActivityItem item={item} />;
     case "tool":
@@ -33,8 +55,81 @@ export function TimelineItem({
   }
 }
 
-function TimelineMessage({ item }: { readonly item: SessionTranscriptMessage }) {
+export function TimelineToolCallGroup({
+  items,
+  expanded,
+  expandedToolCallIds,
+  onToggleGroup,
+  onToggleToolCall,
+}: {
+  readonly items: readonly TimelineToolCall[];
+  readonly expanded: boolean;
+  readonly expandedToolCallIds?: ReadonlySet<string>;
+  readonly onToggleGroup?: (groupId: string) => void;
+  readonly onToggleToolCall?: (callId: string) => void;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const groupId = buildToolGroupId(items);
+  const groupStatus = summarizeToolGroupStatus(items);
+
+  return (
+    <article className={`timeline-tool-group timeline-tool-group--${groupStatus}`} data-testid="timeline-tool-group">
+      <button
+        className="timeline-tool-group__header"
+        data-testid="timeline-tool-group-toggle"
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => onToggleGroup?.(groupId)}
+      >
+        <span className={`timeline-tool-group__chevron ${expanded ? "timeline-tool-group__chevron--expanded" : ""}`}>
+          <ChevronRightIcon />
+        </span>
+        <span className="timeline-tool-group__label">{buildToolGroupLabel(items)}</span>
+        <span className="timeline-tool-group__meta">{buildToolGroupMeta(items, groupStatus)}</span>
+      </button>
+      {expanded ? (
+        <div className="timeline-tool-group__body">
+          {items.map((toolCall) => (
+            <TimelineToolCallItem
+              item={toolCall}
+              key={toolCall.id}
+              expanded={expandedToolCallIds?.has(toolCall.callId) ?? false}
+              onToggle={onToggleToolCall}
+            />
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function TimelineMessage({
+  item,
+  expandedStructuredMessageIds,
+  onToggleStructuredMessage,
+}: {
+  readonly item: SessionTranscriptMessage;
+  readonly expandedStructuredMessageIds?: ReadonlySet<string>;
+  readonly onToggleStructuredMessage?: (messageId: string) => void;
+}) {
   if (item.role === "user") {
+    if (isStructuredUserBrief(item.text)) {
+      const expanded = expandedStructuredMessageIds?.has(item.id) ?? false;
+      return (
+        <TimelineStructuredMessage
+          expanded={expanded}
+          item={item}
+          label="Handoff brief"
+          meta={buildStructuredMessageMeta(item.text, "section")}
+          preview={buildStructuredMessagePreview(item.text, "Open handoff")}
+          onToggle={onToggleStructuredMessage}
+        />
+      );
+    }
+
     return (
       <article className="timeline-item timeline-item--user">
         <div className="timeline-item__bubble">
@@ -70,13 +165,16 @@ function TimelineMessage({ item }: { readonly item: SessionTranscriptMessage }) 
   }
 
   if (item.role === "branchSummary" || item.role === "compactionSummary") {
+    const expanded = expandedStructuredMessageIds?.has(item.id) ?? false;
     return (
-      <article className="timeline-item timeline-item--summary-card">
-        <div className="timeline-item__summary-eyebrow">
-          {item.role === "branchSummary" ? "Branch summary" : "Compaction summary"}
-        </div>
-        <MessageMarkdown text={item.text} />
-      </article>
+      <TimelineStructuredMessage
+        expanded={expanded}
+        item={item}
+        label={item.role === "branchSummary" ? "Branch summary" : "Compaction summary"}
+        meta={buildStructuredMessageMeta(item.text, "item")}
+        preview={buildStructuredMessagePreview(item.text, "View summary")}
+        onToggle={onToggleStructuredMessage}
+      />
     );
   }
 
@@ -85,6 +183,151 @@ function TimelineMessage({ item }: { readonly item: SessionTranscriptMessage }) 
       <MessageMarkdown text={item.text} />
     </article>
   );
+}
+
+function TimelineStructuredMessage({
+  item,
+  expanded,
+  label,
+  preview,
+  meta,
+  onToggle,
+}: {
+  readonly item: SessionTranscriptMessage;
+  readonly expanded: boolean;
+  readonly label: string;
+  readonly preview: string;
+  readonly meta: string;
+  readonly onToggle?: (messageId: string) => void;
+}) {
+  return (
+    <article className="timeline-summary-message" data-testid="timeline-summary-message">
+      <button
+        className="timeline-summary-message__header"
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => onToggle?.(item.id)}
+      >
+        <span className={`timeline-summary-message__chevron ${expanded ? "timeline-summary-message__chevron--expanded" : ""}`}>
+          <ChevronRightIcon />
+        </span>
+        <span className="timeline-summary-message__label">{label}</span>
+        <span className="timeline-summary-message__preview">{preview}</span>
+        <span className="timeline-summary-message__meta">{meta}</span>
+      </button>
+      {expanded ? (
+        <div className="timeline-summary-message__body">
+          <MessageMarkdown text={item.text} />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function buildStructuredMessagePreview(text: string, emptyLabel: string): string {
+  const pathMatch = text.match(/([\w./-]+\.[a-z0-9]+)/i);
+  if (pathMatch?.[1]) {
+    return shortenPath(pathMatch[1]);
+  }
+
+  const firstLine = text
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  if (!firstLine) {
+    return emptyLabel;
+  }
+
+  const normalized = firstLine
+    .replace(/^#+\s*/, "")
+    .replace(/^[-*+]\s*/, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .trim();
+
+  if (normalized.length <= 52) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 51)}…`;
+}
+
+function buildStructuredMessageMeta(text: string, preferredUnit: "item" | "section"): string {
+  const sectionCount = countStructuredSections(text);
+  if (preferredUnit === "section" && sectionCount > 0) {
+    return `${sectionCount} section${sectionCount === 1 ? "" : "s"}`;
+  }
+
+  const itemCount = text
+    .split("\n")
+    .filter((line) => /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line))
+    .length;
+
+  if (itemCount > 0) {
+    return `${itemCount} item${itemCount === 1 ? "" : "s"}`;
+  }
+
+  if (sectionCount > 0) {
+    return `${sectionCount} section${sectionCount === 1 ? "" : "s"}`;
+  }
+
+  const lineCount = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .length;
+
+  return `${lineCount} line${lineCount === 1 ? "" : "s"}`;
+}
+
+function countStructuredSections(text: string): number {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) =>
+      Boolean(line)
+      && !/^[-*+]/.test(line)
+      && !/^\d+[.)]\s+/.test(line)
+      && !/^```/.test(line)
+      && (/[:：]$/.test(line) || /^(?:file plan|file prompt|worktree phải dùng|branch hiện tại|lưu ý quan trọng|prompt ready-to-paste)$/i.test(line)),
+    )
+    .length;
+}
+
+export function isStructuredUserBrief(text: string): boolean {
+  const normalized = text.toLowerCase();
+  const keywordMatches = STRUCTURED_USER_BRIEF_KEYWORDS.filter((keyword) => normalized.includes(keyword)).length;
+  if (keywordMatches === 0) {
+    return false;
+  }
+
+  let signalCount = 0;
+  if (text.length > 500) {
+    signalCount += 1;
+  }
+  if (text.split("\n").filter((line) => /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line)).length >= 3) {
+    signalCount += 1;
+  }
+  if (text.includes("```")) {
+    signalCount += 1;
+  }
+  if (/\.md\b|\/Users\/|docs\//.test(text)) {
+    signalCount += 1;
+  }
+  if (countStructuredSections(text) >= 3) {
+    signalCount += 1;
+  }
+
+  return signalCount >= 2;
+}
+
+export function isStructuredTimelineMessage(item: TranscriptMessage): boolean {
+  return item.kind === "message"
+    && (
+      item.role === "branchSummary"
+      || item.role === "compactionSummary"
+      || (item.role === "user" && isStructuredUserBrief(item.text))
+    );
 }
 
 function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
@@ -181,6 +424,38 @@ function TimelineToolCallItem({
       ) : null}
     </article>
   );
+}
+
+export function buildToolGroupId(items: readonly TimelineToolCall[]): string {
+  return items[0] ? `tool-group:${items[0].callId}` : "tool-group:empty";
+}
+
+function summarizeToolGroupStatus(items: readonly TimelineToolCall[]): "running" | "success" | "error" {
+  if (items.some((item) => item.status === "running")) {
+    return "running";
+  }
+  if (items.some((item) => item.status === "error")) {
+    return "error";
+  }
+  return "success";
+}
+
+function buildToolGroupLabel(items: readonly TimelineToolCall[]): string {
+  if (items.length === 1) {
+    return items[0]?.label ?? "1 tool call";
+  }
+  return `${items.length} tool calls`;
+}
+
+function buildToolGroupMeta(
+  items: readonly TimelineToolCall[],
+  status: "running" | "success" | "error",
+): string {
+  const uniqueToolNames = [...new Set(items.map((item) => item.toolName).filter(Boolean))];
+  const preview = uniqueToolNames.slice(0, 3).join(", ");
+  const overflowCount = Math.max(0, uniqueToolNames.length - 3);
+  const previewLabel = overflowCount > 0 ? `${preview} +${overflowCount}` : preview;
+  return previewLabel ? `${previewLabel} · ${statusLabel(status)}` : statusLabel(status);
 }
 
 function isWriteTool(toolName: string): boolean {

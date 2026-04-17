@@ -268,18 +268,38 @@ export function messageText(message: Record<string, unknown>): string {
   }
 
   if (Array.isArray(content)) {
-    return content
-      .map((part) =>
+    return joinTranscriptTextParts(
+      content.map((part) =>
         isRecord(part) && part.type === "text" && typeof part.text === "string"
           ? stripSerializedFileAttachments(part.text, message.role).text
           : "",
-      )
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
+      ),
+    );
   }
 
   return "";
+}
+
+function joinTranscriptTextParts(parts: readonly string[]): string {
+  let result = "";
+
+  for (const part of parts) {
+    if (!part) {
+      continue;
+    }
+
+    if (!result) {
+      result = part;
+      continue;
+    }
+
+    const previousChar = result[result.length - 1] ?? "";
+    const nextChar = part[0] ?? "";
+    const needsSpace = previousChar !== "" && nextChar !== "" && /\S/.test(previousChar) && /\S/.test(nextChar);
+    result += needsSpace ? ` ${part}` : part;
+  }
+
+  return result.trim();
 }
 
 function messageAttachments(message: Record<string, unknown>) {

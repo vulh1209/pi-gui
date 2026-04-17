@@ -1,7 +1,8 @@
-import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject, type RefCallback, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type RefCallback, type RefObject } from "react";
 import type { TranscriptMessage } from "./desktop-state";
 import { ThreadSearchBar } from "./thread-search";
-import { TimelineItem } from "./timeline-item";
+import { buildToolGroupId, isStructuredTimelineMessage, TimelineItem, TimelineToolCallGroup } from "./timeline-item";
+import type { TimelineToolCall } from "./timeline-types";
 
 const OVERSCAN_PX = 720;
 const ROW_GAP_PX = 14;
@@ -30,6 +31,18 @@ interface ConversationTimelineProps {
   readonly onContentHeightChange: () => void;
 }
 
+type TimelineRow =
+  | {
+    readonly kind: "item";
+    readonly id: string;
+    readonly item: TranscriptMessage;
+  }
+  | {
+    readonly kind: "tool-group";
+    readonly id: string;
+    readonly items: readonly TimelineToolCall[];
+  };
+
 export function ConversationTimeline({
   transcript,
   isTranscriptLoading,
@@ -41,8 +54,11 @@ export function ConversationTimeline({
   onJumpToLatest,
   onContentHeightChange,
 }: ConversationTimelineProps) {
-  const shouldVirtualize = !threadSearch.isOpen && transcript.length > VIRTUALIZATION_THRESHOLD;
+  const timelineRows = useMemo(() => buildTimelineRows(transcript), [transcript]);
+  const shouldVirtualize = !threadSearch.isOpen && timelineRows.length > VIRTUALIZATION_THRESHOLD;
   const [expandedToolCallIds, setExpandedToolCallIds] = useState<Set<string>>(() => new Set());
+  const [expandedToolGroupIds, setExpandedToolGroupIds] = useState<Set<string>>(() => new Set());
+  const [expandedStructuredMessageIds, setExpandedStructuredMessageIds] = useState<Set<string>>(() => new Set());
 
   useLayoutEffect(() => {
     const availableToolCallIds = new Set(
@@ -65,6 +81,52 @@ export function ConversationTimeline({
     });
   }, [transcript]);
 
+  useLayoutEffect(() => {
+    const availableStructuredMessageIds = new Set(
+      transcript
+        .filter(isStructuredTimelineMessage)
+        .map((item) => item.id),
+    );
+    setExpandedStructuredMessageIds((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (!availableStructuredMessageIds.has(id)) {
+          changed = true;
+          continue;
+        }
+        next.add(id);
+      }
+      return changed ? next : current;
+    });
+  }, [transcript]);
+
+  useLayoutEffect(() => {
+    const availableToolGroupIds = new Set(
+      timelineRows
+        .filter((row): row is Extract<TimelineRow, { kind: "tool-group" }> => row.kind === "tool-group")
+        .map((row) => row.id),
+    );
+    setExpandedToolGroupIds((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+      let changed = false;
+      const next = new Set<string>();
+      for (const groupId of current) {
+        if (!availableToolGroupIds.has(groupId)) {
+          changed = true;
+          continue;
+        }
+        next.add(groupId);
+      }
+      return changed ? next : current;
+    });
+  }, [timelineRows]);
+
   const toggleToolCall = useCallback((callId: string) => {
     setExpandedToolCallIds((current) => {
       const next = new Set(current);
@@ -72,6 +134,30 @@ export function ConversationTimeline({
         next.delete(callId);
       } else {
         next.add(callId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleToolGroup = useCallback((groupId: string) => {
+    setExpandedToolGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleStructuredMessage = useCallback((messageId: string) => {
+    setExpandedStructuredMessageIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
       }
       return next;
     });
@@ -111,20 +197,28 @@ export function ConversationTimeline({
         </div>
       ) : shouldVirtualize ? (
         <VirtualizedTranscriptList
-          transcript={transcript}
+          rows={timelineRows}
           timelinePaneRef={timelinePaneRef}
           onContentHeightChange={onContentHeightChange}
+          expandedToolGroupIds={expandedToolGroupIds}
           expandedToolCallIds={expandedToolCallIds}
+          expandedStructuredMessageIds={expandedStructuredMessageIds}
+          onToggleToolGroup={toggleToolGroup}
           onToggleToolCall={toggleToolCall}
+          onToggleStructuredMessage={toggleStructuredMessage}
         />
       ) : (
         <div className="timeline" data-testid="transcript">
-          {transcript.map((item) => (
-            <TimelineItem
-              item={item}
-              key={item.id}
+          {timelineRows.map((row) => (
+            <TimelineRowItem
+              row={row}
+              key={row.id}
+              expandedToolGroupIds={expandedToolGroupIds}
               expandedToolCallIds={expandedToolCallIds}
+              expandedStructuredMessageIds={expandedStructuredMessageIds}
+              onToggleToolGroup={toggleToolGroup}
               onToggleToolCall={toggleToolCall}
+              onToggleStructuredMessage={toggleStructuredMessage}
             />
           ))}
         </div>
@@ -139,17 +233,25 @@ export function ConversationTimeline({
 }
 
 function VirtualizedTranscriptList({
-  transcript,
+  rows,
   timelinePaneRef,
   onContentHeightChange,
+  expandedToolGroupIds,
   expandedToolCallIds,
+  expandedStructuredMessageIds,
+  onToggleToolGroup,
   onToggleToolCall,
+  onToggleStructuredMessage,
 }: {
-  readonly transcript: readonly TranscriptMessage[];
+  readonly rows: readonly TimelineRow[];
   readonly timelinePaneRef: MutableRefObject<HTMLDivElement | null>;
   readonly onContentHeightChange: () => void;
+  readonly expandedToolGroupIds: ReadonlySet<string>;
   readonly expandedToolCallIds: ReadonlySet<string>;
+  readonly expandedStructuredMessageIds: ReadonlySet<string>;
+  readonly onToggleToolGroup: (groupId: string) => void;
   readonly onToggleToolCall: (callId: string) => void;
+  readonly onToggleStructuredMessage: (messageId: string) => void;
 }) {
   const measuredHeightsRef = useRef(new Map<string, number>());
   const [, setMeasurementVersion] = useState(0);
@@ -157,7 +259,7 @@ function VirtualizedTranscriptList({
   const previousTotalHeightRef = useRef(0);
 
   useLayoutEffect(() => {
-    const knownIds = new Set(transcript.map((item) => item.id));
+    const knownIds = new Set(rows.map((row) => row.id));
     let removedAny = false;
     for (const id of measuredHeightsRef.current.keys()) {
       if (knownIds.has(id)) {
@@ -169,7 +271,7 @@ function VirtualizedTranscriptList({
     if (removedAny) {
       setMeasurementVersion((current) => current + 1);
     }
-  }, [transcript]);
+  }, [rows]);
 
   useLayoutEffect(() => {
     const pane = timelinePaneRef.current;
@@ -210,7 +312,7 @@ function VirtualizedTranscriptList({
     setMeasurementVersion((current) => current + 1);
   }, []);
 
-  const rowHeights = transcript.map((item) => measuredHeightsRef.current.get(item.id) ?? estimateTimelineItemHeight(item));
+  const rowHeights = rows.map((row) => measuredHeightsRef.current.get(row.id) ?? estimateTimelineRowHeight(row, expandedToolGroupIds, expandedStructuredMessageIds));
   const rowOffsets: number[] = [];
   let totalHeight = 0;
   for (const [index, rowHeight] of rowHeights.entries()) {
@@ -236,16 +338,20 @@ function VirtualizedTranscriptList({
 
   return (
     <div className="timeline timeline--virtualized" data-testid="transcript" style={{ height: `${totalHeight}px` }}>
-      {transcript.slice(startIndex, endIndex).map((item, offsetIndex) => {
+      {rows.slice(startIndex, endIndex).map((row, offsetIndex) => {
         const index = startIndex + offsetIndex;
         return (
           <MeasuredTimelineRow
-            item={item}
-            key={item.id}
+            row={row}
+            key={row.id}
             top={rowOffsets[index] ?? 0}
             onHeightChange={updateMeasuredHeight}
+            expandedToolGroupIds={expandedToolGroupIds}
             expandedToolCallIds={expandedToolCallIds}
+            expandedStructuredMessageIds={expandedStructuredMessageIds}
+            onToggleToolGroup={onToggleToolGroup}
             onToggleToolCall={onToggleToolCall}
+            onToggleStructuredMessage={onToggleStructuredMessage}
           />
         );
       })}
@@ -254,17 +360,25 @@ function VirtualizedTranscriptList({
 }
 
 function MeasuredTimelineRow({
-  item,
+  row,
   top,
   onHeightChange,
+  expandedToolGroupIds,
   expandedToolCallIds,
+  expandedStructuredMessageIds,
+  onToggleToolGroup,
   onToggleToolCall,
+  onToggleStructuredMessage,
 }: {
-  readonly item: TranscriptMessage;
+  readonly row: TimelineRow;
   readonly top: number;
   readonly onHeightChange: (id: string, height: number) => void;
+  readonly expandedToolGroupIds: ReadonlySet<string>;
   readonly expandedToolCallIds: ReadonlySet<string>;
+  readonly expandedStructuredMessageIds: ReadonlySet<string>;
+  readonly onToggleToolGroup: (groupId: string) => void;
   readonly onToggleToolCall: (callId: string) => void;
+  readonly onToggleStructuredMessage: (messageId: string) => void;
 }) {
   const rowRef = useRef<HTMLDivElement | null>(null);
 
@@ -275,7 +389,7 @@ function MeasuredTimelineRow({
     }
 
     const measure = () => {
-      onHeightChange(item.id, element.getBoundingClientRect().height);
+      onHeightChange(row.id, element.getBoundingClientRect().height);
     };
 
     measure();
@@ -287,17 +401,93 @@ function MeasuredTimelineRow({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [item.id, onHeightChange]);
+  }, [onHeightChange, row.id]);
 
   return (
     <div className="timeline__virtual-row" ref={rowRef} style={{ transform: `translateY(${top}px)` }}>
-      <TimelineItem
-        item={item}
+      <TimelineRowItem
+        row={row}
+        expandedToolGroupIds={expandedToolGroupIds}
         expandedToolCallIds={expandedToolCallIds}
+        expandedStructuredMessageIds={expandedStructuredMessageIds}
+        onToggleToolGroup={onToggleToolGroup}
         onToggleToolCall={onToggleToolCall}
+        onToggleStructuredMessage={onToggleStructuredMessage}
       />
     </div>
   );
+}
+
+function TimelineRowItem({
+  row,
+  expandedToolGroupIds,
+  expandedToolCallIds,
+  expandedStructuredMessageIds,
+  onToggleToolGroup,
+  onToggleToolCall,
+  onToggleStructuredMessage,
+}: {
+  readonly row: TimelineRow;
+  readonly expandedToolGroupIds: ReadonlySet<string>;
+  readonly expandedToolCallIds: ReadonlySet<string>;
+  readonly expandedStructuredMessageIds: ReadonlySet<string>;
+  readonly onToggleToolGroup: (groupId: string) => void;
+  readonly onToggleToolCall: (callId: string) => void;
+  readonly onToggleStructuredMessage: (messageId: string) => void;
+}) {
+  if (row.kind === "tool-group") {
+    return (
+      <TimelineToolCallGroup
+        items={row.items}
+        expanded={expandedToolGroupIds.has(row.id)}
+        expandedToolCallIds={expandedToolCallIds}
+        onToggleGroup={onToggleToolGroup}
+        onToggleToolCall={onToggleToolCall}
+      />
+    );
+  }
+
+  return (
+    <TimelineItem
+      item={row.item}
+      expandedToolCallIds={expandedToolCallIds}
+      expandedStructuredMessageIds={expandedStructuredMessageIds}
+      onToggleToolCall={onToggleToolCall}
+      onToggleStructuredMessage={onToggleStructuredMessage}
+    />
+  );
+}
+
+function buildTimelineRows(transcript: readonly TranscriptMessage[]): TimelineRow[] {
+  const rows: TimelineRow[] = [];
+  let pendingTools: TimelineToolCall[] = [];
+
+  const flushPendingTools = () => {
+    if (pendingTools.length === 0) {
+      return;
+    }
+
+    rows.push({
+      kind: "tool-group",
+      id: buildToolGroupId(pendingTools),
+      items: pendingTools,
+    });
+    pendingTools = [];
+  };
+
+  for (const item of transcript) {
+    if (item.kind === "tool") {
+      pendingTools.push(item);
+      continue;
+    }
+
+    flushPendingTools();
+    rows.push({ kind: "item", id: item.id, item });
+  }
+
+  flushPendingTools();
+
+  return rows;
 }
 
 function findStartIndex(offsets: readonly number[], heights: readonly number[], targetOffset: number): number {
@@ -338,8 +528,32 @@ function findEndIndex(offsets: readonly number[], targetOffset: number): number 
   return Math.min(offsets.length, Math.max(lastVisibleIndex + 1, 1));
 }
 
-function estimateTimelineItemHeight(item: TranscriptMessage): number {
+function estimateTimelineRowHeight(
+  row: TimelineRow,
+  expandedToolGroupIds: ReadonlySet<string>,
+  expandedStructuredMessageIds: ReadonlySet<string>,
+): number {
+  if (row.kind === "tool-group") {
+    if (!expandedToolGroupIds.has(row.id)) {
+      return 44;
+    }
+    return 52 + (row.items.length * 58) + ((row.items.length - 1) * 8);
+  }
+
+  return estimateTimelineItemHeight(row.item, expandedStructuredMessageIds);
+}
+
+function estimateTimelineItemHeight(item: TranscriptMessage, expandedStructuredMessageIds: ReadonlySet<string>): number {
   if (item.kind === "message") {
+    if (isStructuredTimelineMessage(item) && !expandedStructuredMessageIds.has(item.id)) {
+      return 48;
+    }
+
+    if (isStructuredTimelineMessage(item)) {
+      const textLength = Math.max(item.text.length, 1);
+      return 78 + Math.min(280, Math.ceil(textLength / 90) * 20);
+    }
+
     const attachmentHeight = item.attachments?.some((attachment) => attachment.kind === "image")
       ? 120
       : item.attachments?.length

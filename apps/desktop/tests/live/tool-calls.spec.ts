@@ -7,7 +7,7 @@ import {
   makeWorkspace,
 } from "../helpers/electron-app";
 
-test("renders a real tool call item that expands and collapses from the transcript", async () => {
+test("renders grouped tool calls that expand and collapse from the transcript", async () => {
   test.setTimeout(180_000);
   const realAuth = getRealAuthConfig();
   test.skip(!realAuth.enabled, realAuth.skipReason);
@@ -30,10 +30,17 @@ test("renders a real tool call item that expands and collapses from the transcri
 
     await expect(window.getByTestId("transcript")).toContainText("TOOL_OK", { timeout: 150_000 });
     await expect
-      .poll(async () => window.locator(".timeline-tool").count(), { timeout: 120_000 })
+      .poll(async () => window.getByTestId("timeline-tool-group").count(), { timeout: 120_000 })
       .toBeGreaterThan(0);
 
-    const toolItem = window.locator(".timeline-tool").first();
+    const toolGroup = window.getByTestId("timeline-tool-group").first();
+    const toolGroupHeader = toolGroup.getByTestId("timeline-tool-group-toggle");
+    await expect(toolGroupHeader).toHaveAttribute("aria-expanded", "false");
+
+    await toolGroupHeader.click();
+    await expect(toolGroupHeader).toHaveAttribute("aria-expanded", "true");
+
+    const toolItem = toolGroup.locator(".timeline-tool").first();
     const toolHeader = toolItem.locator(".timeline-tool__header");
     await expect(toolHeader).toHaveAttribute("aria-expanded", "false");
 
@@ -45,6 +52,10 @@ test("renders a real tool call item that expands and collapses from the transcri
     await toolHeader.click();
     await expect(toolHeader).toHaveAttribute("aria-expanded", "false");
     await expect(toolItem.locator(".timeline-tool__body")).toHaveCount(0);
+
+    await toolGroupHeader.click();
+    await expect(toolGroupHeader).toHaveAttribute("aria-expanded", "false");
+    await expect(toolGroup.locator(".timeline-tool")).toHaveCount(0);
   } finally {
     await harness.close();
   }
