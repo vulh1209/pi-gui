@@ -4,6 +4,7 @@ import {
   DefaultResourceLoader,
   ModelRegistry,
   SessionManager,
+  type EventBus,
   type ExtensionFactory,
   type ToolDefinition,
   type AgentSession,
@@ -81,6 +82,7 @@ export interface PiSdkDriverOptions {
   readonly modelRegistry?: ModelRegistry;
   readonly customTools?: readonly ToolDefinition[];
   readonly extensionFactories?: readonly ExtensionFactory[];
+  readonly eventBus?: EventBus;
   readonly generateThreadTitleOverride?: (
     workspace: WorkspaceRef,
     options: import("./thread-title-generator.js").GenerateThreadTitleOptions,
@@ -151,6 +153,7 @@ export class SessionSupervisor {
   private readonly modelRegistry: ModelRegistry | undefined;
   private readonly customTools: readonly ToolDefinition[];
   private readonly extensionFactories: readonly ExtensionFactory[];
+  private readonly eventBus: EventBus | undefined;
   private readonly agentDir: string | undefined;
   private readonly records = new Map<string, ManagedSessionRecord>();
 
@@ -162,6 +165,7 @@ export class SessionSupervisor {
     this.modelRegistry = options.modelRegistry;
     this.customTools = options.customTools ?? [];
     this.extensionFactories = options.extensionFactories ?? [];
+    this.eventBus = options.eventBus;
     this.agentDir = options.agentDir;
   }
 
@@ -311,10 +315,11 @@ export class SessionSupervisor {
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     };
-    if (this.extensionFactories.length > 0) {
+    if (this.extensionFactories.length > 0 || this.eventBus) {
       const resourceLoader = new DefaultResourceLoader({
         cwd: workspace.path,
         ...(this.agentDir ? { agentDir: this.agentDir } : {}),
+        ...(this.eventBus ? { eventBus: this.eventBus } : {}),
         extensionFactories: [...this.extensionFactories],
       });
       await resourceLoader.reload();
@@ -419,6 +424,21 @@ export class SessionSupervisor {
 
       if (isExtensionCommand) {
         await this.syncRecordAfterSessionMutation(record, { emitUpdate: true });
+      } else if (!isQueuedMessage && runId && record.runningRunId === runId && !session.isStreaming) {
+        record.runningRunId = undefined;
+        record.status = "idle";
+        record.updatedAt = nowIso();
+        record.config = deriveSessionConfig(session.sessionManager);
+        record.sessionCommands = this.collectSessionCommands(session);
+        await this.persistSnapshot(record);
+        await this.emit(record, {
+          type: "runCompleted",
+          sessionRef: record.ref,
+          timestamp: record.updatedAt,
+          runId,
+          snapshot: buildSnapshot(record),
+        });
+        await this.emit(record, sessionUpdatedEvent(record));
       }
     } catch (error) {
       if (isQueuedMessage) {
@@ -670,10 +690,11 @@ export class SessionSupervisor {
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     };
-    if (this.extensionFactories.length > 0) {
+    if (this.extensionFactories.length > 0 || this.eventBus) {
       const resourceLoader = new DefaultResourceLoader({
         cwd: workspace.path,
         ...(this.agentDir ? { agentDir: this.agentDir } : {}),
+        ...(this.eventBus ? { eventBus: this.eventBus } : {}),
         extensionFactories: [...this.extensionFactories],
       });
       await resourceLoader.reload();

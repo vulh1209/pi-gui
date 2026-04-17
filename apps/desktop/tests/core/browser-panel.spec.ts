@@ -33,7 +33,8 @@ test("opens and closes the browser companion from the topbar and persists the de
 
     await window.getByRole("button", { name: "Toggle browser companion" }).click();
     await expect(panel).toBeVisible();
-    await expect(panel.getByText("Paste a URL to start browsing")).toBeVisible();
+    await expect(panel).toContainText("Ready to browse");
+    await expect(window.getByLabel("Browser address")).toHaveAttribute("placeholder", "Paste a URL to start browsing");
 
     await window.getByRole("button", { name: "Toggle browser companion" }).click();
     await expect(panel).toHaveCount(0);

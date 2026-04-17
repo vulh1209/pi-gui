@@ -3,6 +3,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import {
   DefaultPackageManager,
   DefaultResourceLoader,
+  type EventBus,
   type PackageSource,
   SettingsManager,
   parseFrontmatter,
@@ -57,6 +58,7 @@ export interface RuntimeSupervisorOptions {
   readonly agentDir?: string;
   readonly authStorage?: AuthStorage;
   readonly modelRegistry?: ModelRegistry;
+  readonly eventBus?: EventBus;
 }
 
 type ResourceScope = "user" | "project";
@@ -66,6 +68,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
   private readonly agentDir: string;
   private readonly authStorage: AuthStorage;
   private readonly modelRegistry: ModelRegistry;
+  private readonly eventBus: EventBus | undefined;
   private readonly contexts = new Map<string, RuntimeContext>();
 
   constructor(options: RuntimeSupervisorOptions = {}) {
@@ -73,6 +76,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     this.agentDir = deps.agentDir;
     this.authStorage = deps.authStorage;
     this.modelRegistry = deps.modelRegistry;
+    this.eventBus = options.eventBus;
   }
 
   async getRuntimeSnapshot(workspace: WorkspaceRef): Promise<RuntimeSnapshot> {
@@ -306,6 +310,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
       cwd: workspace.path,
       agentDir: this.agentDir,
       settingsManager,
+      ...(this.eventBus ? { eventBus: this.eventBus } : {}),
     });
     try {
       await resourceLoader.reload();
@@ -326,6 +331,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
             cwd: workspace.path,
             agentDir: this.agentDir,
             settingsManager: candidateSettingsManager,
+            ...(this.eventBus ? { eventBus: this.eventBus } : {}),
           });
           await candidateResourceLoader.reload();
           return {
@@ -358,6 +364,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
           cwd: workspace.path,
           agentDir: this.agentDir,
           settingsManager,
+          ...(this.eventBus ? { eventBus: this.eventBus } : {}),
         });
         await resourceLoader.reload();
       }
@@ -423,6 +430,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
             cwd: context.workspace.path,
             agentDir: this.agentDir,
             settingsManager: candidateSettingsManager,
+            ...(this.eventBus ? { eventBus: this.eventBus } : {}),
           });
           await candidateResourceLoader.reload();
           const resolvedPaths = await candidatePackageManager.resolve();
@@ -458,12 +466,13 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         cwd: context.workspace.path,
         agentDir: this.agentDir,
         settingsManager: fallbackSettingsManager,
+        ...(this.eventBus ? { eventBus: this.eventBus } : {}),
       });
       await fallbackResourceLoader.reload();
       context.settingsManager = fallbackSettingsManager;
       context.packageManager = fallbackPackageManager;
       context.resourceLoader = fallbackResourceLoader;
-      return fallbackPackageManager.resolve();
+      return await fallbackPackageManager.resolve();
     }
   }
 
@@ -807,7 +816,17 @@ function inferSkillName(filePath: string): string {
 }
 
 function inferExtensionName(filePath: string): string {
-  return basename(filePath).replace(/\.(c|m)?(t|j)sx?$/i, "");
+  const fileName = basename(filePath).replace(/\.(c|m)?(t|j)sx?$/i, "");
+  if (fileName !== "index") {
+    return fileName;
+  }
+
+  const parentDir = basename(dirname(filePath));
+  if (parentDir !== "src") {
+    return parentDir;
+  }
+
+  return basename(dirname(dirname(filePath)));
 }
 
 const DESKTOP_API_KEY_PROVIDER_IDS = new Set([

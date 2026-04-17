@@ -10,14 +10,6 @@ import {
   parseComposerCommand,
   resolveRuntimeSlashCommand,
 } from "../src/composer-commands";
-import {
-  BROWSER_SLASH_USAGE,
-  isBrowserSlashCommand,
-  parsePreferredBrowserWebIntent,
-  parseNaturalLanguageBrowserIntentSequence,
-  parseBrowserSlashCommand,
-  parseNaturalLanguageBrowserIntent,
-} from "../src/browser-command-routing";
 import { appendUserMessage, clearActiveAssistantMessage } from "./app-store-timeline";
 import {
   cloneComposerAttachments,
@@ -274,42 +266,12 @@ export async function submitComposer(
   const resolvedRuntimeSlashCommand = runtimeSlashCommand
     ? resolveRuntimeSlashCommand(text, runtime, sessionCommands)
     : undefined;
-  const browserPreferredIntent =
-    attachments.length === 0 && store.state.browserWebTaskRoutingMode === "prefer-browser-companion"
-      ? parsePreferredBrowserWebIntent(text)
-      : undefined;
 
   if (text.startsWith("/") && !runtimeSlashCommand) {
     const handled = await runComposerCommand(store, sessionRef, text);
     if (handled) {
       return handled;
     }
-  }
-
-  if (browserPreferredIntent) {
-    return executeBrowserActionSequence(store, sessionRef, key, browserPreferredIntent.actions, browserPreferredIntent.label);
-  }
-
-  const naturalLanguageBrowserAction = attachments.length === 0
-    ? parseNaturalLanguageBrowserIntent(text)
-    : undefined;
-  const naturalLanguageBrowserSequence = attachments.length === 0
-    ? parseNaturalLanguageBrowserIntentSequence(text)
-    : undefined;
-  if (naturalLanguageBrowserSequence) {
-    return executeBrowserActionSequence(
-      store,
-      sessionRef,
-      key,
-      naturalLanguageBrowserSequence.actions,
-      naturalLanguageBrowserSequence.label,
-    );
-  }
-  if (naturalLanguageBrowserAction) {
-    await store.runBrowserHostAction(naturalLanguageBrowserAction);
-    return finishComposerCommand(store, sessionRef, key, `Browser ${naturalLanguageBrowserAction.name}`, {
-      appendActivity: false,
-    });
   }
 
   const selectedSession = store.sessionFromState(sessionRef);
@@ -536,19 +498,6 @@ async function runComposerCommand(
   sessionRef: SessionRef,
   commandText: string,
 ): Promise<DesktopAppState | undefined> {
-  const browserAction = parseBrowserSlashCommand(commandText);
-  if (browserAction) {
-    const key = sessionKey(sessionRef);
-    await store.runBrowserHostAction(browserAction);
-    return finishComposerCommand(store, sessionRef, key, `Browser ${browserAction.name}`, {
-      appendActivity: false,
-    });
-  }
-
-  if (isBrowserSlashCommand(commandText)) {
-    return store.withError(BROWSER_SLASH_USAGE);
-  }
-
   const parsed = parseComposerCommand(commandText);
   if (!parsed) {
     const message = incompleteComposerCommandMessage(commandText);
@@ -616,22 +565,6 @@ async function runComposerCommand(
   }
 
   return store.withError(`Unsupported slash command: ${commandText}`);
-}
-
-async function executeBrowserActionSequence(
-  store: AppStoreInternals,
-  sessionRef: SessionRef,
-  key: string,
-  actions: readonly import("../src/browser-command-routing").BrowserHostAction[],
-  label: string,
-): Promise<DesktopAppState> {
-  for (const action of actions) {
-    await store.runBrowserHostAction(action);
-  }
-
-  return finishComposerCommand(store, sessionRef, key, label, {
-    appendActivity: false,
-  });
 }
 
 function appendLocalActivity(

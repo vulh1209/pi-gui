@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   createNamedThread,
   desktopShortcut,
+  getDesktopState,
   getSelectedTranscript,
   launchDesktop,
   makeGitWorkspace,
@@ -208,6 +209,13 @@ test("common natural-language browser intents route into the same browser comman
     await expectBrowserTitle(window, "Natural Language");
     await expect(window.getByLabel("Browser address")).toHaveValue(naturalUrl);
     await expectTranscriptToContainToolLabel(window, "Open browser companion");
+    await expect
+      .poll(async () => {
+        const state = await getDesktopState(window);
+        const workspace = state.workspaces.find((entry) => entry.id === state.selectedWorkspaceId);
+        return workspace?.sessions.find((entry) => entry.id === state.selectedSessionId)?.status ?? "";
+      })
+      .toBe("idle");
 
     await window.getByRole("button", { name: "Toggle browser companion" }).click();
     await expect(window.getByTestId("browser-panel")).toHaveCount(0);
@@ -223,6 +231,32 @@ test("common natural-language browser intents route into the same browser comman
     await submitComposerText(window, "show the browser");
     await expect(window.getByTestId("transcript")).toContainText("show the browser");
     await expectBrowserTitle(window, "Natural Language");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("browser companion extension is discoverable in the Extensions view", async () => {
+  test.setTimeout(30_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeGitWorkspace("browser-extension-discovery-workspace");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Browser extension discovery test");
+
+    await window.getByRole("button", { name: "Extensions", exact: true }).click();
+    await expect(window.getByTestId("extensions-list")).toContainText("pi-browser-companion-extension");
+    await window.getByTestId("extensions-list").locator(".skill-card").filter({ hasText: "pi-browser-companion-extension" }).first().click();
+    await expect(window.locator(".skill-detail")).toContainText("browser.open");
+    await expect(window.locator(".skill-detail")).toContainText("browser.search");
+    await expect(window.locator(".skill-detail")).toContainText("browser.focus");
+    await expect(window.locator(".skill-detail")).toContainText("browser");
+
   } finally {
     await harness.close();
   }
@@ -246,6 +280,13 @@ test("browser-first routing preference prioritizes the browser companion for web
     await submitComposerText(window, `open ${preferenceUrl}`);
     await expect(window.getByTestId("transcript")).toContainText(`open ${preferenceUrl}`);
     await expect(window.getByTestId("browser-panel")).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const state = await getDesktopState(window);
+        const workspace = state.workspaces.find((entry) => entry.id === state.selectedWorkspaceId);
+        return workspace?.sessions.find((entry) => entry.id === state.selectedSessionId)?.status ?? "";
+      })
+      .not.toBe("running");
 
     await window.keyboard.press(desktopShortcut(","));
     await window.getByRole("button", { name: "Prefer browser companion" }).click();
