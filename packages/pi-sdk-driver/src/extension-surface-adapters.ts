@@ -202,7 +202,10 @@ function isTungdevSettingsExtensionPath(extensionPath: string): boolean {
   const normalizedPath = normalizeComparablePath(extensionPath);
   return (
     normalizedPath.includes("/@tungthedev/pi-extensions/") &&
-    normalizedPath.endsWith("/extensions/settings/index.ts")
+    (
+      normalizedPath.endsWith("/extensions/settings/index.ts") ||
+      normalizedPath.endsWith("/extensions/pi-modes.ts")
+    )
   );
 }
 
