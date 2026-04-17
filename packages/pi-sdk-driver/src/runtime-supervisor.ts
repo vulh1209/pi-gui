@@ -54,6 +54,68 @@ interface ProjectWritableSettingsManager {
   saveProjectSettings(settings: Record<string, unknown>): void;
 }
 
+type RuntimeExtensionCommandVisibility = "chat" | "extensions-page" | "hidden";
+
+interface RuntimeExtensionCommandRecordLike {
+  readonly name: string;
+  readonly description?: string;
+  readonly visibility?: RuntimeExtensionCommandVisibility;
+}
+
+type RuntimeExtensionSurfaceFieldRecordLike =
+  | {
+      readonly kind: "enum";
+      readonly key: string;
+      readonly label: string;
+      readonly description?: string;
+      readonly value: string;
+      readonly options: readonly {
+        readonly value: string;
+        readonly label: string;
+        readonly description?: string;
+      }[];
+    }
+  | {
+      readonly kind: "boolean";
+      readonly key: string;
+      readonly label: string;
+      readonly description?: string;
+      readonly value: boolean;
+    };
+
+interface RuntimeExtensionSurfaceRecordLike {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly kind: "settings-form";
+  readonly fields: readonly RuntimeExtensionSurfaceFieldRecordLike[];
+}
+
+interface ExtensionSurfaceAdapter {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly kind: RuntimeExtensionSurfaceRecordLike["kind"];
+  readonly fields: RuntimeExtensionSurfaceRecordLike["fields"];
+}
+
+interface RegisteredExtensionCommandAdapter {
+  readonly name: string;
+  readonly invocationName?: string;
+  readonly description?: string;
+  readonly visibility?: RuntimeExtensionCommandVisibility;
+}
+
+interface LoadedExtensionAdapter {
+  readonly path: string;
+  readonly resolvedPath?: string;
+  readonly commands: ReadonlyMap<string, RegisteredExtensionCommandAdapter>;
+  readonly tools: ReadonlyMap<string, { readonly definition: { readonly name: string } }>;
+  readonly flags: ReadonlyMap<string, unknown>;
+  readonly shortcuts: ReadonlyMap<string, unknown>;
+  readonly surfaces?: readonly ExtensionSurfaceAdapter[];
+}
+
 export interface RuntimeSupervisorOptions {
   readonly agentDir?: string;
   readonly authStorage?: AuthStorage;
@@ -619,7 +681,10 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
   ): Promise<readonly RuntimeExtensionRecord[]> {
     const loadedResult = context.resourceLoader.getExtensions();
     const loadedByPath = new Map(
-      loadedResult.extensions.map((extension) => [resolve(extension.resolvedPath || extension.path), extension] as const),
+      loadedResult.extensions.map((extension) => [
+        resolve(extension.resolvedPath || extension.path),
+        extension as unknown as LoadedExtensionAdapter,
+      ] as const),
     );
     const diagnosticsByPath = new Map<string, RuntimeExtensionDiagnostic[]>();
 
@@ -636,12 +701,23 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     const records = resolvedExtensions.map<RuntimeExtensionRecord>((resource) => {
       const path = resolve(resource.path);
       const loaded = loadedByPath.get(path);
+      const commandRecords = loaded
+        ? [...loaded.commands.values()]
+            .map<RuntimeExtensionCommandRecordLike>((command) => ({
+              name: command.invocationName ?? command.name,
+              ...(command.description ? { description: command.description } : {}),
+              ...(command.visibility ? { visibility: command.visibility } : {}),
+            }))
+            .sort((left, right) => left.name.localeCompare(right.name))
+        : [];
       return {
         path,
         displayName: inferExtensionName(path),
         enabled: resource.enabled,
         sourceInfo: toRuntimeSourceInfo(path, resource.metadata),
-        commands: loaded ? [...loaded.commands.keys()].sort((left, right) => left.localeCompare(right)) : [],
+        commands: commandRecords.map((command) => command.name),
+        commandRecords,
+        surfaces: loaded?.surfaces ? [...loaded.surfaces] : [],
         tools: loaded
           ? [...loaded.tools.values()]
               .map((tool) => tool.definition.name)

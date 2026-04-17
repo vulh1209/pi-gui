@@ -52,12 +52,51 @@ export interface RuntimeExtensionDiagnostic {
   readonly path?: string;
 }
 
+export type RuntimeExtensionCommandVisibility = "chat" | "extensions-page" | "hidden";
+
+export interface RuntimeExtensionCommandRecord {
+  readonly name: string;
+  readonly description?: string;
+  readonly visibility?: RuntimeExtensionCommandVisibility;
+}
+
+export type RuntimeExtensionSurfaceFieldRecord =
+  | {
+      readonly kind: "enum";
+      readonly key: string;
+      readonly label: string;
+      readonly description?: string;
+      readonly value: string;
+      readonly options: readonly {
+        readonly value: string;
+        readonly label: string;
+        readonly description?: string;
+      }[];
+    }
+  | {
+      readonly kind: "boolean";
+      readonly key: string;
+      readonly label: string;
+      readonly description?: string;
+      readonly value: boolean;
+    };
+
+export interface RuntimeExtensionSurfaceRecord {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly kind: "settings-form";
+  readonly fields: readonly RuntimeExtensionSurfaceFieldRecord[];
+}
+
 export interface RuntimeExtensionRecord {
   readonly path: string;
   readonly displayName: string;
   readonly enabled: boolean;
   readonly sourceInfo: RuntimeSourceInfo;
   readonly commands: readonly string[];
+  readonly commandRecords: readonly RuntimeExtensionCommandRecord[];
+  readonly surfaces: readonly RuntimeExtensionSurfaceRecord[];
   readonly tools: readonly string[];
   readonly flags: readonly string[];
   readonly shortcuts: readonly string[];

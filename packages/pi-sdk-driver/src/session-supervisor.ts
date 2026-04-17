@@ -126,6 +126,7 @@ interface RegisteredCommandAdapter {
   readonly name: string;
   readonly invocationName?: string;
   readonly description?: string;
+  readonly visibility?: "chat" | "extensions-page" | "hidden";
   readonly sourceInfo?: RuntimeCommandRecord["sourceInfo"];
   readonly extensionPath?: string;
 }
