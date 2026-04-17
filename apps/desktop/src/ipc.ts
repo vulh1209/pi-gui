@@ -56,6 +56,12 @@ export const desktopIpc = {
   setActiveView: "pi-gui:set-active-view",
   setBrowserPanelOpen: "pi-gui:set-browser-panel-open",
   setBrowserAutomationPolicy: "pi-gui:set-browser-automation-policy",
+  setBrowserPanelBounds: "pi-gui:set-browser-panel-bounds",
+  syncBrowserPanelWorkspace: "pi-gui:sync-browser-panel-workspace",
+  navigateBrowserPanel: "pi-gui:navigate-browser-panel",
+  browserPanelBack: "pi-gui:browser-panel-back",
+  browserPanelForward: "pi-gui:browser-panel-forward",
+  browserPanelReload: "pi-gui:browser-panel-reload",
   refreshRuntime: "pi-gui:refresh-runtime",
   setModelSettingsScopeMode: "pi-gui:set-model-settings-scope-mode",
   setDefaultModel: "pi-gui:set-default-model",
@@ -168,6 +174,12 @@ export interface PiDesktopApi {
   setActiveView(view: AppView): Promise<DesktopAppState>;
   setBrowserPanelOpen(open: boolean): Promise<DesktopAppState>;
   setBrowserAutomationPolicy(policy: BrowserAutomationPolicy): Promise<DesktopAppState>;
+  setBrowserPanelBounds(bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): Promise<void>;
+  syncBrowserPanelWorkspace(workspaceId: string): Promise<void>;
+  navigateBrowserPanel(url: string): Promise<void>;
+  browserPanelBack(): Promise<void>;
+  browserPanelForward(): Promise<void>;
+  browserPanelReload(): Promise<void>;
   refreshRuntime(workspaceId?: string): Promise<DesktopAppState>;
   setModelSettingsScopeMode(mode: ModelSettingsScopeMode): Promise<DesktopAppState>;
   setDefaultModel(workspaceId: string, provider: string, modelId: string): Promise<DesktopAppState>;

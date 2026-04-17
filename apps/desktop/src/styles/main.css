@@ -725,10 +725,22 @@
   background: #fff;
 }
 
+.browser-panel__viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #fff;
+}
+
 .browser-panel__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   padding: 20px 16px;
   color: var(--muted-soft);
   font-size: 14px;
+  text-align: center;
 }
 
 .diff-panel__viewer {

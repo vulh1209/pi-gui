@@ -136,6 +136,15 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.setBrowserPanelOpen, open) as Promise<DesktopAppState>,
   setBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) =>
     ipcRenderer.invoke(desktopIpc.setBrowserAutomationPolicy, policy) as Promise<DesktopAppState>,
+  setBrowserPanelBounds: (bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }) =>
+    ipcRenderer.invoke(desktopIpc.setBrowserPanelBounds, bounds) as Promise<void>,
+  syncBrowserPanelWorkspace: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.syncBrowserPanelWorkspace, workspaceId) as Promise<void>,
+  navigateBrowserPanel: (url: string) =>
+    ipcRenderer.invoke(desktopIpc.navigateBrowserPanel, url) as Promise<void>,
+  browserPanelBack: () => ipcRenderer.invoke(desktopIpc.browserPanelBack) as Promise<void>,
+  browserPanelForward: () => ipcRenderer.invoke(desktopIpc.browserPanelForward) as Promise<void>,
+  browserPanelReload: () => ipcRenderer.invoke(desktopIpc.browserPanelReload) as Promise<void>,
   refreshRuntime: (workspaceId?: string) =>
     ipcRenderer.invoke(desktopIpc.refreshRuntime, workspaceId) as Promise<DesktopAppState>,
   setModelSettingsScopeMode: (mode: "app-global" | "per-repo") =>

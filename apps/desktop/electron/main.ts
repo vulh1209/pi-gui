@@ -15,6 +15,8 @@ import {
 } from "./notification-permission";
 import { initUpdateChecker } from "./update-checker";
 import { ThemeManager } from "./theme-manager";
+import { BrowserProfileRegistry } from "./browser-profile-registry";
+import { BrowserPanelManager } from "./browser-panel-manager";
 import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
@@ -44,6 +46,8 @@ let stopPublishingSelectedTranscript: (() => void) | undefined;
 let stopNotifications: (() => void) | undefined;
 let stopUpdateChecker: (() => void) | undefined;
 let quittingAfterStoreFlush = false;
+const browserProfiles = new BrowserProfileRegistry();
+let browserPanel: BrowserPanelManager | null = null;
 
 const SUPPORTED_IMAGE_TYPES = SUPPORTED_COMPOSER_IMAGE_TYPES;
 const SUPPORTED_IMAGE_MIME_TYPES = new Set<string>(SUPPORTED_IMAGE_TYPES.map((type) => type.mimeType));
@@ -293,6 +297,7 @@ app.whenReady().then(async () => {
   if (!isDev) {
     stopUpdateChecker = initUpdateChecker();
   }
+  browserPanel = new BrowserPanelManager(browserProfiles, (state) => store.setBrowserPanelState(state));
 
   ipcMain.handle(desktopIpc.ping, () =>
     devReloadMarkersEnabled ? `pi desktop ready:${MAIN_DEV_RELOAD_MARKER}` : "pi desktop ready",
@@ -344,10 +349,54 @@ app.whenReady().then(async () => {
     store.unarchiveSession(target),
   );
   ipcMain.handle(desktopIpc.setActiveView, (_event, activeView) => store.setActiveView(activeView));
-  ipcMain.handle(desktopIpc.setBrowserPanelOpen, (_event, open: boolean) => store.setBrowserPanelOpen(open));
+  ipcMain.handle(desktopIpc.setBrowserPanelOpen, async (_event, open: boolean) => {
+    const nextState = await store.setBrowserPanelOpen(open);
+    if (!open) {
+      await browserPanel?.close();
+    }
+    return nextState;
+  });
   ipcMain.handle(desktopIpc.setBrowserAutomationPolicy, (_event, policy: BrowserAutomationPolicy) =>
     store.setBrowserAutomationPolicy(policy),
   );
+  ipcMain.handle(desktopIpc.setBrowserPanelBounds, (_event, bounds: Electron.Rectangle) => {
+    browserPanel?.setBounds(bounds);
+  });
+  ipcMain.handle(desktopIpc.syncBrowserPanelWorkspace, async (_event, workspaceId: string) => {
+    if (!mainWindow || !browserPanel) {
+      return;
+    }
+    const state = await store.getState();
+    if (state.browserPanel.mode === "hidden") {
+      return;
+    }
+    if (!browserPanel.hasView() && !state.browserPanel.url) {
+      return;
+    }
+    const bounds = browserPanel.getBounds();
+    if (!bounds) {
+      return;
+    }
+    await browserPanel.syncWorkspace(mainWindow, workspaceId, bounds);
+  });
+  ipcMain.handle(desktopIpc.navigateBrowserPanel, async (_event, url: string) => {
+    const state = await store.getState();
+    const workspaceId = state.selectedWorkspaceId;
+    if (!mainWindow || !browserPanel || !workspaceId) {
+      throw new Error("Browser companion requires an active workspace.");
+    }
+    await browserPanel.show(mainWindow, workspaceId);
+    await browserPanel.navigate(url);
+  });
+  ipcMain.handle(desktopIpc.browserPanelBack, () => {
+    browserPanel?.goBack();
+  });
+  ipcMain.handle(desktopIpc.browserPanelForward, () => {
+    browserPanel?.goForward();
+  });
+  ipcMain.handle(desktopIpc.browserPanelReload, () => {
+    browserPanel?.reload();
+  });
   ipcMain.handle(desktopIpc.refreshRuntime, (_event, workspaceId?: string) => store.refreshRuntime(workspaceId));
   ipcMain.handle(desktopIpc.setModelSettingsScopeMode, (_event, mode) => store.setModelSettingsScopeMode(mode));
   ipcMain.handle(desktopIpc.setSessionModel, (_event, workspaceId: string, sessionId: string, provider: string, modelId: string) =>

@@ -36,6 +36,7 @@ import { buildThreadGroups } from "./thread-groups";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { ConversationTimeline } from "./conversation-timeline";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
 import { useSlashMenu } from "./hooks/use-slash-menu";
 import { useMentionMenu } from "./hooks/use-mention-menu";
 import { useThreadSearch } from "./hooks/use-thread-search";
@@ -173,6 +174,9 @@ export default function App() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const timelinePaneRef = useRef<HTMLDivElement | null>(null);
+  const browserViewportRef = useRef<HTMLDivElement | null>(null);
+  const browserViewportResizeObserverRef = useRef<ResizeObserver | null>(null);
+  const browserViewportResizeHandlerRef = useRef<(() => void) | null>(null);
   const lastTranscriptMarkerRef = useRef("");
   const pinnedToBottomRef = useRef(true);
   const previousTimelinePaneSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -492,6 +496,65 @@ export default function App() {
     void updateSnapshot(api, setSnapshot, () => api.setBrowserPanelOpen(!showBrowserPanel));
   }, [api, showBrowserPanel]);
 
+  const navigateBrowserPanel = useCallback((url: string) => {
+    if (!api) {
+      return;
+    }
+    void api.navigateBrowserPanel(url);
+  }, [api]);
+
+  const goBackBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void api.browserPanelBack();
+  }, [api]);
+
+  const goForwardBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void api.browserPanelForward();
+  }, [api]);
+
+  const reloadBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void api.browserPanelReload();
+  }, [api]);
+
+  const publishBrowserPanelBounds = useCallback((node: HTMLDivElement | null) => {
+    browserViewportResizeObserverRef.current?.disconnect();
+    browserViewportResizeObserverRef.current = null;
+    if (browserViewportResizeHandlerRef.current) {
+      window.removeEventListener("resize", browserViewportResizeHandlerRef.current);
+      browserViewportResizeHandlerRef.current = null;
+    }
+
+    browserViewportRef.current = node;
+    if (!node || !api) {
+      return;
+    }
+
+    const sendBounds = () => {
+      const rect = node.getBoundingClientRect();
+      void api.setBrowserPanelBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      });
+    };
+
+    sendBounds();
+    const observer = new ResizeObserver(() => sendBounds());
+    observer.observe(node);
+    browserViewportResizeObserverRef.current = observer;
+    browserViewportResizeHandlerRef.current = sendBounds;
+    window.addEventListener("resize", sendBounds);
+  }, [api]);
+
   const openSettings = (workspaceId?: string, section?: SettingsSection) => {
     if (!api) {
       return;
@@ -765,6 +828,27 @@ export default function App() {
     setNewThreadRootWorkspaceId(nextRootWorkspaceId);
     setPendingNewThreadWorkspaceId("");
   }, [pendingNewThreadWorkspaceId, rootWorkspaceOptions, snapshot]);
+
+  useEffect(() => {
+    if (!api || !showBrowserPanel || !selectedWorkspace || !snapshot) {
+      return;
+    }
+
+    if (!snapshot.browserPanel.url) {
+      return;
+    }
+
+    void api.syncBrowserPanelWorkspace(selectedWorkspace.id);
+  }, [api, selectedWorkspace?.id, showBrowserPanel, snapshot]);
+
+  useEffect(() => {
+    return () => {
+      browserViewportResizeObserverRef.current?.disconnect();
+      if (browserViewportResizeHandlerRef.current) {
+        window.removeEventListener("resize", browserViewportResizeHandlerRef.current);
+      }
+    };
+  }, []);
 
   const resetNewThreadSurface = (workspaceId?: string) => {
     const nextWorkspaceId =
@@ -1394,7 +1478,7 @@ export default function App() {
     void updateSnapshot(api, setSnapshot, () => api.setNotificationPreferences(preferences));
   };
 
-  const handleSetBrowserAutomationPolicy = (policy: import("./browser-panel-state").BrowserAutomationPolicy) => {
+  const handleSetBrowserAutomationPolicy = (policy: BrowserAutomationPolicy) => {
     if (!api) {
       return;
     }
@@ -1939,7 +2023,16 @@ export default function App() {
                 onNavigate={navigateTreeSelection}
               />
             ) : null}
-            {showBrowserPanel ? <BrowserPanel panel={snapshot.browserPanel} /> : null}
+            {showBrowserPanel ? (
+              <BrowserPanel
+                panel={snapshot.browserPanel}
+                onNavigate={navigateBrowserPanel}
+                onBack={goBackBrowserPanel}
+                onForward={goForwardBrowserPanel}
+                onReload={reloadBrowserPanel}
+                viewportRef={publishBrowserPanelBounds}
+              />
+            ) : null}
           </>
         ) : selectedWorkspace ? (
           <section className="canvas canvas--empty">

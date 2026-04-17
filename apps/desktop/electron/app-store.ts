@@ -33,7 +33,7 @@ import type {
   RuntimeSettingsSnapshot,
   RuntimeSnapshot,
 } from "@pi-gui/session-driver/runtime-types";
-import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
+import type { BrowserAutomationPolicy, BrowserPanelState } from "../src/browser-panel-state";
 import {
   type AppView,
   type ComposerAttachment,
@@ -487,6 +487,16 @@ export class DesktopAppStore implements AppStoreInternals {
     };
     await this.persistUiState();
     return this.emit();
+  }
+
+  async setBrowserPanelState(browserPanel: BrowserPanelState): Promise<void> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserPanel,
+      revision: this.state.revision + 1,
+    };
+    this.emit();
   }
 
   async setModelSettingsScopeMode(modelSettingsScopeMode: ModelSettingsScopeMode): Promise<DesktopAppState> {
