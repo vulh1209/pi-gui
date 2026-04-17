@@ -26,6 +26,11 @@ import type {
 import type { WorkspaceRef } from "@pi-gui/session-driver";
 import { createRuntimeDependencies } from "./runtime-deps.js";
 import { createSettingsManagerWithoutNpmPackages, isGlobalNpmLookupError } from "./npm-package-fallback.js";
+import {
+  formatNpmRecoveryWarning,
+  hasNpmPackageSources,
+  retryWithRecoveredNpmCommand,
+} from "./npm-command-recovery.js";
 import { skillSlashCommand } from "./runtime-command-utils.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
@@ -38,9 +43,9 @@ interface ModelSettingsSnapshot {
 
 interface RuntimeContext {
   readonly workspace: WorkspaceRef;
-  readonly settingsManager: SettingsManager;
-  readonly packageManager: DefaultPackageManager;
-  readonly resourceLoader: DefaultResourceLoader;
+  settingsManager: SettingsManager;
+  packageManager: DefaultPackageManager;
+  resourceLoader: DefaultResourceLoader;
 }
 
 interface ProjectWritableSettingsManager {
@@ -305,33 +310,57 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     try {
       await resourceLoader.reload();
     } catch (error) {
-      if (!isGlobalNpmLookupError(error)) {
+      if (!isGlobalNpmLookupError(error) || !hasNpmPackageSources(settingsManager)) {
         throw error;
       }
 
-      const fallbackSettingsManager = createSettingsManagerWithoutNpmPackages(settingsManager);
-      if (!fallbackSettingsManager) {
-        throw error;
+      const recovered = await retryWithRecoveredNpmCommand({
+        settingsManager,
+        run: async (candidateSettingsManager) => {
+          const candidatePackageManager = new DefaultPackageManager({
+            cwd: workspace.path,
+            agentDir: this.agentDir,
+            settingsManager: candidateSettingsManager,
+          });
+          const candidateResourceLoader = new DefaultResourceLoader({
+            cwd: workspace.path,
+            agentDir: this.agentDir,
+            settingsManager: candidateSettingsManager,
+          });
+          await candidateResourceLoader.reload();
+          return {
+            settingsManager: candidateSettingsManager,
+            packageManager: candidatePackageManager,
+            resourceLoader: candidateResourceLoader,
+          };
+        },
+      });
+
+      if (recovered.ok) {
+        settingsManager = recovered.value.settingsManager;
+        packageManager = recovered.value.packageManager;
+        resourceLoader = recovered.value.resourceLoader;
+      } else {
+        const fallbackSettingsManager = createSettingsManagerWithoutNpmPackages(settingsManager);
+        if (!fallbackSettingsManager) {
+          throw error;
+        }
+
+        console.warn(formatNpmRecoveryWarning("runtime resource loading", workspace.path, recovered.failure));
+
+        settingsManager = fallbackSettingsManager;
+        packageManager = new DefaultPackageManager({
+          cwd: workspace.path,
+          agentDir: this.agentDir,
+          settingsManager,
+        });
+        resourceLoader = new DefaultResourceLoader({
+          cwd: workspace.path,
+          agentDir: this.agentDir,
+          settingsManager,
+        });
+        await resourceLoader.reload();
       }
-
-      console.warn(
-        `[pi-gui] Falling back to runtime resource loading without npm package sources for ${workspace.path}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      settingsManager = fallbackSettingsManager;
-      packageManager = new DefaultPackageManager({
-        cwd: workspace.path,
-        agentDir: this.agentDir,
-        settingsManager,
-      });
-      resourceLoader = new DefaultResourceLoader({
-        cwd: workspace.path,
-        agentDir: this.agentDir,
-        settingsManager,
-      });
-      await resourceLoader.reload();
     }
 
     const context: RuntimeContext = {
@@ -378,8 +407,39 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     try {
       return await context.packageManager.resolve();
     } catch (error) {
-      if (!isGlobalNpmLookupError(error)) {
+      if (!isGlobalNpmLookupError(error) || !hasNpmPackageSources(context.settingsManager)) {
         throw error;
+      }
+
+      const recovered = await retryWithRecoveredNpmCommand({
+        settingsManager: context.settingsManager,
+        run: async (candidateSettingsManager) => {
+          const candidatePackageManager = new DefaultPackageManager({
+            cwd: context.workspace.path,
+            agentDir: this.agentDir,
+            settingsManager: candidateSettingsManager,
+          });
+          const candidateResourceLoader = new DefaultResourceLoader({
+            cwd: context.workspace.path,
+            agentDir: this.agentDir,
+            settingsManager: candidateSettingsManager,
+          });
+          await candidateResourceLoader.reload();
+          const resolvedPaths = await candidatePackageManager.resolve();
+          return {
+            settingsManager: candidateSettingsManager,
+            packageManager: candidatePackageManager,
+            resourceLoader: candidateResourceLoader,
+            resolvedPaths,
+          };
+        },
+      });
+
+      if (recovered.ok) {
+        context.settingsManager = recovered.value.settingsManager;
+        context.packageManager = recovered.value.packageManager;
+        context.resourceLoader = recovered.value.resourceLoader;
+        return recovered.value.resolvedPaths;
       }
 
       const fallbackSettingsManager = createSettingsManagerWithoutNpmPackages(context.settingsManager);
@@ -387,17 +447,22 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         throw error;
       }
 
-      console.warn(
-        `[pi-gui] Falling back to runtime package resolution without npm package sources for ${context.workspace.path}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      console.warn(formatNpmRecoveryWarning("runtime package resolution", context.workspace.path, recovered.failure));
 
       const fallbackPackageManager = new DefaultPackageManager({
         cwd: context.workspace.path,
         agentDir: this.agentDir,
         settingsManager: fallbackSettingsManager,
       });
+      const fallbackResourceLoader = new DefaultResourceLoader({
+        cwd: context.workspace.path,
+        agentDir: this.agentDir,
+        settingsManager: fallbackSettingsManager,
+      });
+      await fallbackResourceLoader.reload();
+      context.settingsManager = fallbackSettingsManager;
+      context.packageManager = fallbackPackageManager;
+      context.resourceLoader = fallbackResourceLoader;
       return fallbackPackageManager.resolve();
     }
   }

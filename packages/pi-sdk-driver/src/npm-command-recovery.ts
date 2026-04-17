@@ -1,3 +1,4 @@
+import { dirname, isAbsolute, join, parse } from "node:path";
 import { SettingsManager, type PackageSource } from "@mariozechner/pi-coding-agent";
 
 export interface NpmCommandAttempt {
@@ -85,9 +86,31 @@ export function buildNpmCommandCandidates(
   push(settingsManager.getNpmCommand());
   for (const command of candidateStringsForPlatform(platform)) {
     push([command]);
+    push(buildNodeWrappedNpmCommand(command, platform));
   }
 
   return candidates;
+}
+
+function buildNodeWrappedNpmCommand(
+  npmCommand: string,
+  platform: NodeJS.Platform,
+): readonly string[] | undefined {
+  if (!isAbsolute(npmCommand)) {
+    return undefined;
+  }
+
+  const npmDir = dirname(npmCommand);
+  if (platform === "win32") {
+    return [join(npmDir, "node.exe"), npmCommand];
+  }
+
+  const parsed = parse(npmCommand);
+  if (!parsed.base.startsWith("npm")) {
+    return undefined;
+  }
+
+  return [join(npmDir, "node"), npmCommand];
 }
 
 export function cloneSettingsManagerWithNpmCommand(
