@@ -1,19 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ExtensionsSurface } from "../extensions-surface";
 import {
-  tungdevCompatibilityFixture,
-  tungdevExtensionsFixture,
-  tungdevVisibilityOverridesFixture,
+  compatibilityFixture,
+  noVisibilityOverridesFixture,
+  tungdevPiModesExtensionFixture,
 } from "./extensions-fixtures";
 
-const extension = tungdevExtensionsFixture[0]!;
-
 const meta: Meta<typeof ExtensionsSurface> = {
+  title: "Extensions/Inline Surface",
   component: ExtensionsSurface,
   args: {
-    extension,
-    compatibilityRecords: tungdevCompatibilityFixture,
-    visibilityOverrides: tungdevVisibilityOverridesFixture,
+    extension: tungdevPiModesExtensionFixture,
+    compatibilityRecords: compatibilityFixture,
+    visibilityOverrides: noVisibilityOverridesFixture,
     onOpenExtensionFolder: () => undefined,
     onToggleExtension: () => undefined,
     onSetSurfaceField: () => undefined,
@@ -24,4 +23,6 @@ const meta: Meta<typeof ExtensionsSurface> = {
 
 export default meta;
 
-export const Default: StoryObj<typeof ExtensionsSurface> = {};
+type Story = StoryObj<typeof ExtensionsSurface>;
+
+export const Default: Story = {};

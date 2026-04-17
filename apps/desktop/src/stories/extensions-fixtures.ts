@@ -1,135 +1,177 @@
-import type { RuntimeExtensionRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { RuntimeSnapshot, RuntimeExtensionRecord } from "@pi-gui/session-driver/runtime-types";
 import type {
   ExtensionCommandCompatibilityRecord,
   ExtensionCommandVisibilityOverrideRecord,
   WorkspaceRecord,
 } from "../desktop-state";
 
-export const tungdevExtensionsFixture: readonly RuntimeExtensionRecord[] = [
-  {
-    path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/pi-modes.ts",
-    displayName: "pi-modes",
-    enabled: true,
-    sourceInfo: {
-      path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/pi-modes.ts",
-      source: "npm:@tungthedev/pi-extensions",
-      scope: "user",
-      origin: "package",
-      baseDir: "/mock/node_modules/@tungthedev/pi-extensions",
-    },
-    commands: ["pi-mode", "pi-mode-status"],
-    commandRecords: [
-      { name: "pi-mode", description: "Configure Pi Mode", visibility: "extensions-page" },
-      { name: "pi-mode-status", description: "Show Pi Mode status", visibility: "chat" },
-    ],
-    surfaces: [
-      {
-        id: "pi-mode-settings",
-        title: "Pi Mode",
-        description: "Configure mode behavior for the Tungdev settings extension.",
-        kind: "settings-form",
-        fields: [
-          {
-            kind: "enum",
-            key: "toolSet",
-            label: "Mode",
-            description: "Choose between Pi, Codex, and Droid behavior packs.",
-            value: "codex",
-            options: [
-              { value: "pi", label: "Pi" },
-              { value: "codex", label: "Codex" },
-              { value: "droid", label: "Droid" },
-            ],
-          },
-          {
-            kind: "boolean",
-            key: "systemMdPrompt",
-            label: "Inject SYSTEM.md",
-            description: "Include repo SYSTEM.md in the selected prompt stack.",
-            value: true,
-          },
-          {
-            kind: "boolean",
-            key: "includePiPromptSection",
-            label: "Include Pi prompt section",
-            description: "Preserve incoming Pi prompt before Codex/Droid instructions.",
-            value: false,
-          },
-        ],
-      },
-    ],
-    tools: ["WebSearch", "WebSummary", "FetchUrl"],
-    flags: [],
-    shortcuts: ["ctrl+shift+t"],
-    diagnostics: [],
-  },
-  {
-    path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/editor.ts",
-    displayName: "editor",
-    enabled: true,
-    sourceInfo: {
-      path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/editor.ts",
-      source: "npm:@tungthedev/pi-extensions",
-      scope: "user",
-      origin: "package",
-      baseDir: "/mock/node_modules/@tungthedev/pi-extensions",
-    },
-    commands: [],
-    commandRecords: [],
-    surfaces: [],
-    tools: [],
-    flags: [],
-    shortcuts: [],
-    diagnostics: [],
-  },
-  {
-    path: "/mock/project/.pi/extensions/local-helper.ts",
-    displayName: "local-helper",
-    enabled: true,
-    sourceInfo: {
-      path: "/mock/project/.pi/extensions/local-helper.ts",
-      source: "extension",
-      scope: "project",
-      origin: "top-level",
-      baseDir: "/mock/project/.pi/extensions",
-    },
-    commands: ["local-helper"],
-    commandRecords: [{ name: "local-helper", description: "Project-local helper", visibility: "chat" }],
-    surfaces: [],
-    tools: ["LocalTool"],
-    flags: [],
-    shortcuts: [],
-    diagnostics: [],
-  },
-];
-
-export const tungdevVisibilityOverridesFixture: readonly ExtensionCommandVisibilityOverrideRecord[] = [];
-
-export const tungdevCompatibilityFixture: readonly ExtensionCommandCompatibilityRecord[] = [
-  {
-    commandName: "pi-mode",
-    extensionPath: "/mock/node_modules/@tungthedev/pi-extensions/extensions/pi-modes.ts",
-    status: "supported",
-    message: "Observed working in pi-gui.",
-    capability: "gui-safe",
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-export const extensionsStoryWorkspace: WorkspaceRecord = {
+export const workspaceFixture: WorkspaceRecord = {
   id: "workspace-1",
   name: "pi-gui",
   path: "/mock/pi-gui",
-  lastOpenedAt: new Date().toISOString(),
+  lastOpenedAt: new Date("2026-04-17T10:00:00.000Z").toISOString(),
   kind: "primary",
   sessions: [],
 };
 
-export const extensionsStoryRuntime: RuntimeSnapshot = {
-  workspace: { workspaceId: "workspace-1", path: "/mock/pi-gui", displayName: "pi-gui" },
+export const tungdevPiModesExtensionFixture: RuntimeExtensionRecord = {
+  path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/pi-modes.ts",
+  displayName: "pi-modes",
+  enabled: true,
+  sourceInfo: {
+    path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/pi-modes.ts",
+    source: "npm:@tungthedev/pi-extensions",
+    scope: "user",
+    origin: "package",
+    baseDir: "/mock/node_modules/@tungthedev/pi-extensions",
+  },
+  commands: ["pi-mode", "settings"],
+  commandRecords: [
+    {
+      name: "pi-mode",
+      description: "Open Pi Mode settings or update a package setting",
+      visibility: "extensions-page",
+    },
+    {
+      name: "settings",
+      description: "Open package settings",
+      visibility: "hidden",
+    },
+  ],
+  surfaces: [
+    {
+      id: "pi-mode-settings",
+      title: "Pi Mode",
+      description: "Configure mode behavior for the Tungdev settings extension.",
+      kind: "settings-form",
+      fields: [
+        {
+          kind: "enum",
+          key: "toolSet",
+          label: "Mode",
+          description: "Selects the Pi, Codex, or Droid behavior pack for this package.",
+          value: "codex",
+          options: [
+            { value: "pi", label: "Pi" },
+            { value: "codex", label: "Codex" },
+            { value: "droid", label: "Droid" },
+          ],
+        },
+        {
+          kind: "boolean",
+          key: "systemMdPrompt",
+          label: "Inject SYSTEM.md",
+          description: "Inject the repo SYSTEM.md into the selected prompt stack.",
+          value: true,
+        },
+        {
+          kind: "boolean",
+          key: "includePiPromptSection",
+          label: "Include Pi prompt section",
+          description: "Keep the incoming Pi environment prompt and append the selected prompt after it.",
+          value: false,
+        },
+      ],
+    },
+  ],
+  tools: Array.from({ length: 3 }, (_, index) => `tool-${index + 1}`),
+  flags: [],
+  shortcuts: ["ctrl+shift+t"],
+  diagnostics: [],
+};
+
+export const tungdevEditorExtensionFixture: RuntimeExtensionRecord = {
+  path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/editor.ts",
+  displayName: "editor",
+  enabled: true,
+  sourceInfo: {
+    path: "/mock/node_modules/@tungthedev/pi-extensions/extensions/editor.ts",
+    source: "npm:@tungthedev/pi-extensions",
+    scope: "user",
+    origin: "package",
+    baseDir: "/mock/node_modules/@tungthedev/pi-extensions",
+  },
+  commands: [],
+  commandRecords: [],
+  surfaces: [],
+  tools: [],
+  flags: [],
+  shortcuts: [],
+  diagnostics: [],
+};
+
+export const localWorkspaceExtensionFixture: RuntimeExtensionRecord = {
+  path: "/mock/pi-gui/.pi/extensions/local-checks.ts",
+  displayName: "local-checks",
+  enabled: true,
+  sourceInfo: {
+    path: "/mock/pi-gui/.pi/extensions/local-checks.ts",
+    source: "extension:/mock/pi-gui/.pi/extensions/local-checks.ts",
+    scope: "project",
+    origin: "top-level",
+    baseDir: "/mock/pi-gui/.pi/extensions",
+  },
+  commands: ["local-checks"],
+  commandRecords: [
+    {
+      name: "local-checks",
+      description: "Run project-local validation checks",
+      visibility: "chat",
+    },
+  ],
+  surfaces: [],
+  tools: ["lint", "typecheck"],
+  flags: [],
+  shortcuts: [],
+  diagnostics: [
+    {
+      type: "warning",
+      message: "One optional dependency is unavailable in the current workspace.",
+    },
+  ],
+};
+
+export const runtimeFixture: RuntimeSnapshot = {
+  workspace: {
+    workspaceId: workspaceFixture.id,
+    path: workspaceFixture.path,
+    displayName: workspaceFixture.name,
+  },
   providers: [],
   models: [],
   skills: [],
-  extensions: tungdevExtensionsFixture,
-  settings: { enableSkillCommands: true, enabledModelPatterns: [] },
+  extensions: [tungdevPiModesExtensionFixture, tungdevEditorExtensionFixture, localWorkspaceExtensionFixture],
+  settings: {
+    enableSkillCommands: true,
+    enabledModelPatterns: [],
+  },
 };
+
+export const compatibilityFixture: readonly ExtensionCommandCompatibilityRecord[] = [
+  {
+    commandName: "pi-mode",
+    extensionPath: tungdevPiModesExtensionFixture.path,
+    status: "supported",
+    message: "Observed working in pi-gui.",
+    capability: "gui-safe",
+    updatedAt: new Date("2026-04-17T10:05:00.000Z").toISOString(),
+  },
+  {
+    commandName: "settings",
+    extensionPath: tungdevPiModesExtensionFixture.path,
+    status: "terminal-only",
+    message: "Settings command still depends on terminal-only UI in legacy mode.",
+    capability: "custom-ui",
+    updatedAt: new Date("2026-04-17T10:05:30.000Z").toISOString(),
+  },
+];
+
+export const noVisibilityOverridesFixture: readonly ExtensionCommandVisibilityOverrideRecord[] = [];
+
+export const chatVisibilityOverrideFixture: readonly ExtensionCommandVisibilityOverrideRecord[] = [
+  {
+    extensionPath: tungdevPiModesExtensionFixture.path,
+    commandName: "pi-mode",
+    visibility: "chat",
+  },
+];
