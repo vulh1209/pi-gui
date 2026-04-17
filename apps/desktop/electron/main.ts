@@ -31,6 +31,7 @@ import type {
   ComposerImageAttachment,
   CreateSessionInput,
   CreateWorktreeInput,
+  ExtensionCommandVisibilityOverrideRecord,
   RemoveWorktreeInput,
   StartThreadInput,
   WorkspaceSessionTarget,
@@ -556,6 +557,16 @@ app.whenReady().then(async () => {
   );
   ipcMain.handle(desktopIpc.setExtensionEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
     store.setExtensionEnabled(workspaceId, filePath, enabled),
+  );
+  ipcMain.handle(
+    desktopIpc.setExtensionCommandVisibilityOverride,
+    (_event, override: ExtensionCommandVisibilityOverrideRecord) =>
+      store.setExtensionCommandVisibilityOverride(override),
+  );
+  ipcMain.handle(
+    desktopIpc.clearExtensionCommandVisibilityOverride,
+    (_event, extensionPath: string, commandName: string) =>
+      store.clearExtensionCommandVisibilityOverride(extensionPath, commandName),
   );
   ipcMain.handle(desktopIpc.respondToHostUiRequest, (_event, workspaceId: string, sessionId: string, response) =>
     store.respondToHostUiRequest({ workspaceId, sessionId }, response),

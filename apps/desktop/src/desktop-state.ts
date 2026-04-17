@@ -116,6 +116,7 @@ export interface SessionExtensionUiStateRecord {
 }
 
 export type ExtensionCommandCompatibilityStatus = "supported" | "terminal-only";
+export type ExtensionCommandVisibility = "chat" | "extensions-page" | "hidden";
 
 export interface ExtensionCommandCompatibilityRecord {
   readonly commandName: string;
@@ -124,6 +125,12 @@ export interface ExtensionCommandCompatibilityRecord {
   readonly message: string;
   readonly capability: string;
   readonly updatedAt: string;
+}
+
+export interface ExtensionCommandVisibilityOverrideRecord {
+  readonly commandName: string;
+  readonly extensionPath: string;
+  readonly visibility: ExtensionCommandVisibility;
 }
 
 export interface WorkspaceRecord {
@@ -178,6 +185,7 @@ export interface DesktopAppState {
   readonly sessionCommandsBySession: Readonly<Record<string, readonly RuntimeCommandRecord[]>>;
   readonly sessionExtensionUiBySession: Readonly<Record<string, SessionExtensionUiStateRecord>>;
   readonly extensionCommandCompatibilityByWorkspace: Readonly<Record<string, readonly ExtensionCommandCompatibilityRecord[]>>;
+  readonly extensionCommandVisibilityOverrides: readonly ExtensionCommandVisibilityOverrideRecord[];
   readonly notificationPreferences: NotificationPreferences;
   readonly lastViewedAtBySession: Readonly<Record<string, string>>;
   readonly workspaceOrder: readonly string[];
@@ -217,6 +225,7 @@ export function createEmptyDesktopAppState(): DesktopAppState {
     sessionCommandsBySession: {},
     sessionExtensionUiBySession: {},
     extensionCommandCompatibilityByWorkspace: {},
+    extensionCommandVisibilityOverrides: [],
     notificationPreferences: {
       backgroundCompletion: true,
       backgroundFailure: true,

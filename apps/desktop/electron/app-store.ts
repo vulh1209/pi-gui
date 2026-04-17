@@ -41,6 +41,7 @@ import {
   type ComposerAttachment,
   type ComposerDraftSyncSource,
   type ExtensionCommandCompatibilityRecord,
+  type ExtensionCommandVisibilityOverrideRecord,
   type ModelSettingsScopeMode,
   createEmptyDesktopAppState,
   type CreateSessionInput,
@@ -725,6 +726,78 @@ export class DesktopAppStore implements AppStoreInternals {
     );
   }
 
+  async setExtensionCommandVisibilityOverride(
+    override: ExtensionCommandVisibilityOverrideRecord,
+  ): Promise<DesktopAppState> {
+    await this.initialize();
+    const normalizedOverride = normalizeExtensionCommandVisibilityOverride(override);
+    if (!normalizedOverride) {
+      return this.withError("Invalid extension command visibility override.");
+    }
+    const existingIndex = this.state.extensionCommandVisibilityOverrides.findIndex((entry) =>
+      sameExtensionCommandVisibilityOverrideTarget(entry, normalizedOverride),
+    );
+
+    if (existingIndex >= 0) {
+      const existing = this.state.extensionCommandVisibilityOverrides[existingIndex];
+      if (existing?.visibility === normalizedOverride.visibility) {
+        return this.emit();
+      }
+
+      const nextOverrides = [...this.state.extensionCommandVisibilityOverrides];
+      nextOverrides[existingIndex] = normalizedOverride;
+      this.state = {
+        ...this.state,
+        extensionCommandVisibilityOverrides: nextOverrides,
+        lastError: undefined,
+        revision: this.state.revision + 1,
+      };
+      await this.persistUiState();
+      return this.emit();
+    }
+
+    this.state = {
+      ...this.state,
+      extensionCommandVisibilityOverrides: [...this.state.extensionCommandVisibilityOverrides, normalizedOverride],
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
+  async clearExtensionCommandVisibilityOverride(
+    extensionPath: string,
+    commandName: string,
+  ): Promise<DesktopAppState> {
+    await this.initialize();
+    const normalizedExtensionPath = extensionPath.trim();
+    const normalizedCommandName = commandName.trim();
+    if (!normalizedExtensionPath || !normalizedCommandName) {
+      return this.withError("Invalid extension command visibility override target.");
+    }
+    const nextOverrides = this.state.extensionCommandVisibilityOverrides.filter(
+      (entry) =>
+        !(
+          entry.extensionPath === normalizedExtensionPath &&
+          entry.commandName === normalizedCommandName
+        ),
+    );
+
+    if (nextOverrides.length === this.state.extensionCommandVisibilityOverrides.length) {
+      return this.emit();
+    }
+
+    this.state = {
+      ...this.state,
+      extensionCommandVisibilityOverrides: nextOverrides,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
   private async withRuntimeUpdate(
     workspaceId: string,
     action: (ws: WorkspaceRef) => Promise<RuntimeSnapshot>,
@@ -762,6 +835,7 @@ export class DesktopAppStore implements AppStoreInternals {
         browserWebTaskRoutingMode: persisted.browserWebTaskRoutingMode ?? this.state.browserWebTaskRoutingMode,
         modelSettingsScopeMode: persisted.modelSettingsScopeMode ?? this.state.modelSettingsScopeMode,
         globalModelSettings: persisted.appGlobalModelSettings ?? this.state.globalModelSettings,
+        extensionCommandVisibilityOverrides: persisted.extensionCommandVisibilityOverrides ?? [],
         notificationPreferences: {
           ...this.state.notificationPreferences,
           ...persisted.notificationPreferences,
@@ -1711,6 +1785,10 @@ export class DesktopAppStore implements AppStoreInternals {
       composerDraft: this.state.composerDraft || undefined,
       composerDraftsBySession: mapToRecord(this.sessionState.composerDraftsBySession),
       extensionCommandCompatibilityByWorkspace: serializeCompatibilityByWorkspace(this.extensionCommandCompatibilityByWorkspace),
+      extensionCommandVisibilityOverrides:
+        this.state.extensionCommandVisibilityOverrides.length > 0
+          ? this.state.extensionCommandVisibilityOverrides.map((override) => ({ ...override }))
+          : undefined,
       notificationPreferences: this.state.notificationPreferences,
       lastViewedAtBySession: mapToRecord(this.sessionState.lastViewedAtBySession),
       workspaceOrder: this.state.workspaceOrder.length > 0 ? this.state.workspaceOrder : undefined,
@@ -2369,6 +2447,33 @@ function mergeEnabledModelPatterns(
     merged.push(pattern);
   }
   return merged;
+}
+
+function normalizeExtensionCommandVisibilityOverride(
+  override: ExtensionCommandVisibilityOverrideRecord,
+): ExtensionCommandVisibilityOverrideRecord | undefined {
+  const commandName = override.commandName.trim();
+  const extensionPath = override.extensionPath.trim();
+  if (!commandName || !extensionPath || !isExtensionCommandVisibility(override.visibility)) {
+    return undefined;
+  }
+
+  return {
+    commandName,
+    extensionPath,
+    visibility: override.visibility,
+  };
+}
+
+function isExtensionCommandVisibility(value: unknown): value is ExtensionCommandVisibilityOverrideRecord["visibility"] {
+  return value === "chat" || value === "extensions-page" || value === "hidden";
+}
+
+function sameExtensionCommandVisibilityOverrideTarget(
+  left: Pick<ExtensionCommandVisibilityOverrideRecord, "extensionPath" | "commandName">,
+  right: Pick<ExtensionCommandVisibilityOverrideRecord, "extensionPath" | "commandName">,
+): boolean {
+  return left.extensionPath === right.extensionPath && left.commandName === right.commandName;
 }
 
 function formatCapabilityLabel(capability: string): string {

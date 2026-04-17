@@ -18,6 +18,7 @@ import type {
   CreateSessionInput,
   CreateWorktreeInput,
   DesktopAppState,
+  ExtensionCommandVisibilityOverrideRecord,
   NotificationPreferences,
   RemoveWorktreeInput,
   SelectedTranscriptRecord,
@@ -175,6 +176,14 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.setSkillEnabled, workspaceId, filePath, enabled) as Promise<DesktopAppState>,
   setExtensionEnabled: (workspaceId: string, filePath: string, enabled: boolean) =>
     ipcRenderer.invoke(desktopIpc.setExtensionEnabled, workspaceId, filePath, enabled) as Promise<DesktopAppState>,
+  setExtensionCommandVisibilityOverride: (override: ExtensionCommandVisibilityOverrideRecord) =>
+    ipcRenderer.invoke(desktopIpc.setExtensionCommandVisibilityOverride, override) as Promise<DesktopAppState>,
+  clearExtensionCommandVisibilityOverride: (extensionPath: string, commandName: string) =>
+    ipcRenderer.invoke(
+      desktopIpc.clearExtensionCommandVisibilityOverride,
+      extensionPath,
+      commandName,
+    ) as Promise<DesktopAppState>,
   respondToHostUiRequest: (workspaceId: string, sessionId: string, response: HostUiResponse) =>
     ipcRenderer.invoke(desktopIpc.respondToHostUiRequest, workspaceId, sessionId, response) as Promise<DesktopAppState>,
   setNotificationPreferences: (preferences: Partial<NotificationPreferences>) =>

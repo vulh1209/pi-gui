@@ -1,6 +1,8 @@
 import type {
   AppView,
   BrowserWebTaskRoutingMode,
+  ExtensionCommandVisibility,
+  ExtensionCommandVisibilityOverrideRecord,
   ExtensionCommandCompatibilityRecord,
   ModelSettingsScopeMode,
   NotificationPreferences,
@@ -20,6 +22,7 @@ export interface PersistedUiState {
   readonly composerDraft?: string;
   readonly composerDraftsBySession?: Record<string, string>;
   readonly extensionCommandCompatibilityByWorkspace?: Record<string, readonly ExtensionCommandCompatibilityRecord[]>;
+  readonly extensionCommandVisibilityOverrides?: readonly ExtensionCommandVisibilityOverrideRecord[];
   readonly notificationPreferences?: NotificationPreferences;
   readonly lastViewedAtBySession?: Record<string, string>;
   readonly workspaceOrder?: readonly string[];
@@ -46,23 +49,26 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
           ? 8
           : parsed.version === 7
             ? 7
-          : parsed.version === 6
-          ? 6
-          : parsed.version === 5
-            ? 5
-            : parsed.version === 4
-              ? 4
-              : parsed.version === 3
-                ? 3
-                : parsed.version === 2
-                  ? 2
-                  : undefined,
+            : parsed.version === 6
+              ? 6
+              : parsed.version === 5
+                ? 5
+                : parsed.version === 4
+                  ? 4
+                  : parsed.version === 3
+                    ? 3
+                    : parsed.version === 2
+                      ? 2
+                      : undefined,
       selectedWorkspaceId: parsed.selectedWorkspaceId,
       selectedSessionId: parsed.selectedSessionId,
       activeView: parsed.activeView,
       composerDraft: parsed.composerDraft ?? "",
       composerDraftsBySession: parsed.composerDraftsBySession,
       extensionCommandCompatibilityByWorkspace: parsed.extensionCommandCompatibilityByWorkspace,
+      extensionCommandVisibilityOverrides: toPersistedExtensionCommandVisibilityOverrides(
+        parsed.extensionCommandVisibilityOverrides,
+      ),
       notificationPreferences: parsed.notificationPreferences,
       lastViewedAtBySession: parsed.lastViewedAtBySession,
       workspaceOrder: Array.isArray(parsed.workspaceOrder) ? parsed.workspaceOrder : undefined,
@@ -151,6 +157,65 @@ function toPersistedModelSettingsSnapshot(value: unknown): ModelSettingsSnapshot
       : {}),
     enabledModelPatterns,
   };
+}
+
+function toPersistedExtensionCommandVisibilityOverrides(
+  value: unknown,
+): readonly ExtensionCommandVisibilityOverrideRecord[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const overridesByKey = new Map<string, ExtensionCommandVisibilityOverrideRecord>();
+  for (const entry of value) {
+    const override = toPersistedExtensionCommandVisibilityOverrideRecord(entry);
+    if (!override) {
+      continue;
+    }
+    overridesByKey.set(extensionCommandVisibilityOverrideKey(override), override);
+  }
+
+  return [...overridesByKey.values()];
+}
+
+function toPersistedExtensionCommandVisibilityOverrideRecord(
+  value: unknown,
+): ExtensionCommandVisibilityOverrideRecord | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.commandName !== "string" ||
+    typeof candidate.extensionPath !== "string" ||
+    !isExtensionCommandVisibility(candidate.visibility)
+  ) {
+    return undefined;
+  }
+
+  const commandName = candidate.commandName.trim();
+  const extensionPath = candidate.extensionPath.trim();
+  if (!commandName || !extensionPath) {
+    return undefined;
+  }
+
+  return {
+    commandName,
+    extensionPath,
+    visibility: candidate.visibility,
+  };
+}
+
+function isExtensionCommandVisibility(value: unknown): value is ExtensionCommandVisibility {
+  return value === "chat" || value === "extensions-page" || value === "hidden";
+}
+
+function extensionCommandVisibilityOverrideKey(value: {
+  readonly extensionPath: string;
+  readonly commandName: string;
+}): string {
+  return `${value.extensionPath}\u0000${value.commandName}`;
 }
 
 function isMissingFileError(error: unknown): boolean {

@@ -13,6 +13,7 @@ import type {
   CreateSessionInput,
   CreateWorktreeInput,
   DesktopAppState,
+  ExtensionCommandVisibilityOverrideRecord,
   ModelSettingsScopeMode,
   NotificationPreferences,
   RemoveWorktreeInput,
@@ -78,6 +79,8 @@ export const desktopIpc = {
   setScopedModelPatterns: "pi-gui:set-scoped-model-patterns",
   setSkillEnabled: "pi-gui:set-skill-enabled",
   setExtensionEnabled: "pi-gui:set-extension-enabled",
+  setExtensionCommandVisibilityOverride: "pi-gui:set-extension-command-visibility-override",
+  clearExtensionCommandVisibilityOverride: "pi-gui:clear-extension-command-visibility-override",
   respondToHostUiRequest: "pi-gui:respond-to-host-ui-request",
   setNotificationPreferences: "pi-gui:set-notification-preferences",
   getNotificationPermissionStatus: "pi-gui:get-notification-permission-status",
@@ -210,6 +213,10 @@ export interface PiDesktopApi {
   setScopedModelPatterns(workspaceId: string, patterns: readonly string[]): Promise<DesktopAppState>;
   setSkillEnabled(workspaceId: string, filePath: string, enabled: boolean): Promise<DesktopAppState>;
   setExtensionEnabled(workspaceId: string, filePath: string, enabled: boolean): Promise<DesktopAppState>;
+  setExtensionCommandVisibilityOverride(
+    override: ExtensionCommandVisibilityOverrideRecord,
+  ): Promise<DesktopAppState>;
+  clearExtensionCommandVisibilityOverride(extensionPath: string, commandName: string): Promise<DesktopAppState>;
   respondToHostUiRequest(
     workspaceId: string,
     sessionId: string,
