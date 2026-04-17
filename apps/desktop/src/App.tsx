@@ -16,7 +16,7 @@ import {
 } from "./desktop-state";
 import { formatRelativeTime } from "./string-utils";
 import { ComposerPanel } from "./composer-panel";
-import { BrowserPanel } from "./browser-panel";
+import { BrowserAutomationDialog, BrowserPanel } from "./browser-panel";
 import { DiffPanel } from "./diff-panel";
 import { buildModelOptions } from "./composer-commands";
 import { parseTreeComposerCommand } from "./composer-commands";
@@ -364,6 +364,7 @@ export default function App() {
   const isSelectedExtensionDockExpanded = dockExpandedBySession[selectedSessionKey] ?? false;
   const persistedComposerDraft = snapshot?.composerDraft ?? "";
   const showBrowserPanel = snapshot ? snapshot.browserPanel.mode !== "hidden" : false;
+  const browserAutomationConfirmation = snapshot?.browserAutomationConfirmation;
   const threadGroups = useMemo(
     () => (snapshot ? buildThreadGroups(snapshot) : []),
     [snapshot?.workspaces, snapshot?.worktreesByWorkspace, snapshot?.workspaceOrder],
@@ -1557,6 +1558,18 @@ export default function App() {
     });
   };
 
+  const handleRespondToBrowserAutomationConfirmation = (approved: boolean) => {
+    if (!api || !browserAutomationConfirmation) {
+      return;
+    }
+
+    void updateSnapshot(api, setSnapshot, () =>
+      api.respondToBrowserAutomationConfirmation(browserAutomationConfirmation.requestId, approved),
+    ).then(() => {
+      focusComposer();
+    });
+  };
+
   const handleToggleExtensionDock = () => {
     if (!selectedExtensionDock) {
       return;
@@ -2030,6 +2043,12 @@ export default function App() {
             />
             {activeExtensionDialog ? (
               <ExtensionDialog dialog={activeExtensionDialog} onRespond={handleRespondToExtensionDialog} />
+            ) : null}
+            {browserAutomationConfirmation ? (
+              <BrowserAutomationDialog
+                confirmation={browserAutomationConfirmation}
+                onRespond={handleRespondToBrowserAutomationConfirmation}
+              />
             ) : null}
             {treeModalState.open ? (
               <TreeModal

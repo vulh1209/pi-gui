@@ -22,6 +22,11 @@ export class BrowserPanelManager {
     return this.view?.getBounds() ?? this.lastBounds;
   }
 
+  currentUrl(): string | undefined {
+    const url = this.view?.webContents.getURL();
+    return url || undefined;
+  }
+
   setBounds(bounds: Electron.Rectangle): void {
     this.lastBounds = bounds;
     this.view?.setBounds(bounds);
@@ -92,6 +97,26 @@ export class BrowserPanelManager {
     this.view?.webContents.focus();
   }
 
+  async click(selector: string): Promise<void> {
+    await this.runDomAction("click", { selector });
+  }
+
+  async type(selector: string, text: string): Promise<void> {
+    await this.runDomAction("type", { selector, text });
+  }
+
+  async submit(selector: string): Promise<void> {
+    await this.runDomAction("submit", { selector });
+  }
+
+  async scroll(target: "up" | "down" | "top" | "bottom"): Promise<void> {
+    await this.runDomAction("scroll", { target });
+  }
+
+  async select(selector: string, value: string): Promise<void> {
+    await this.runDomAction("select", { selector, value });
+  }
+
   async close(): Promise<void> {
     this.view?.setVisible(false);
     await this.publish({
@@ -159,5 +184,115 @@ export class BrowserPanelManager {
     this.view = null;
     this.activeWorkspaceId = null;
     this.activeWindow = null;
+  }
+
+  private async runDomAction(
+    kind: "click" | "type" | "submit" | "scroll" | "select",
+    payload: Record<string, string>,
+  ): Promise<void> {
+    if (!this.view) {
+      throw new Error("Browser companion is not open.");
+    }
+
+    const script = `(() => {
+      const payload = ${JSON.stringify(payload)};
+      const kind = ${JSON.stringify(kind)};
+
+      const getElement = () => {
+        const selector = payload.selector;
+        if (!selector) {
+          throw new Error("Browser action requires a selector.");
+        }
+        const element = document.querySelector(selector);
+        if (!element) {
+          throw new Error("No element matches selector: " + selector);
+        }
+        if (element instanceof HTMLElement) {
+          element.scrollIntoView({ block: "center", inline: "center" });
+          element.focus();
+        }
+        return element;
+      };
+
+      if (kind === "click") {
+        const element = getElement();
+        if (element instanceof HTMLElement) {
+          element.click();
+          return true;
+        }
+        throw new Error("Matched element is not clickable.");
+      }
+
+      if (kind === "type") {
+        const element = getElement();
+        const text = payload.text ?? "";
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+          element.value = text;
+          element.dispatchEvent(new Event("input", { bubbles: true }));
+          element.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        }
+        if (element instanceof HTMLElement && element.isContentEditable) {
+          element.textContent = text;
+          element.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
+          element.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        }
+        throw new Error("Matched element is not typable.");
+      }
+
+      if (kind === "submit") {
+        const element = getElement();
+        const form = element instanceof HTMLFormElement ? element : element.closest("form");
+        if (form instanceof HTMLFormElement) {
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          } else {
+            form.submit();
+          }
+          return true;
+        }
+        if (element instanceof HTMLElement) {
+          element.click();
+          return true;
+        }
+        throw new Error("Matched element cannot be submitted.");
+      }
+
+      if (kind === "scroll") {
+        const target = payload.target;
+        if (target === "top") {
+          window.scrollTo({ top: 0, behavior: "auto" });
+          return true;
+        }
+        if (target === "bottom") {
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+          return true;
+        }
+        const amount = Math.max(window.innerHeight * 0.8, 240);
+        window.scrollBy({ top: target === "up" ? -amount : amount, behavior: "auto" });
+        return true;
+      }
+
+      if (kind === "select") {
+        const element = getElement();
+        if (!(element instanceof HTMLSelectElement)) {
+          throw new Error("Matched element is not a <select>.");
+        }
+        const value = payload.value ?? "";
+        const option = [...element.options].find((entry) => entry.value === value || entry.label === value || entry.text === value);
+        if (!option) {
+          throw new Error("No option matches value: " + value);
+        }
+        element.value = option.value;
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      }
+
+      throw new Error("Unsupported browser DOM action: " + kind);
+    })();`;
+
+    await this.view.webContents.executeJavaScript(script, true);
   }
 }

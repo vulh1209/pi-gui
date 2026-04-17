@@ -492,6 +492,17 @@
   overflow-y: auto;
 }
 
+.browser-automation-dialog__details {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f7fb;
+  color: var(--muted-strong);
+  font-size: 13px;
+}
+
 .timeline-tool__diff-header {
   display: flex;
   align-items: center;

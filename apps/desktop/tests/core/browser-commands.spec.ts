@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createNamedThread, getSelectedTranscript, launchDesktop, makeGitWorkspace, makeUserDataDir } from "../helpers/electron-app";
+import {
+  createNamedThread,
+  desktopShortcut,
+  getSelectedTranscript,
+  launchDesktop,
+  makeGitWorkspace,
+  makeUserDataDir,
+} from "../helpers/electron-app";
 
 async function submitComposerText(window: Page, text: string): Promise<void> {
   const composer = window.getByTestId("composer");
@@ -21,6 +28,52 @@ async function expectTranscriptToContainToolLabel(window: Page, label: string): 
 async function expectBrowserTitle(window: Page, title: string): Promise<void> {
   await expect(window.getByTestId("browser-panel")).toBeVisible();
   await expect(window.locator(".browser-panel__title")).toContainText(title);
+}
+
+async function approveBrowserAutomation(window: Page): Promise<void> {
+  await expect(window.getByTestId("browser-automation-dialog")).toBeVisible();
+  await window.getByRole("button", { name: "Allow once" }).click();
+}
+
+function interactiveBrowserPageUrl(): string {
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <title>Interactive Ready</title>
+        <style>body{height:2400px;font-family:sans-serif;padding:24px} form,select,button,input{display:block;margin:16px 0}</style>
+      </head>
+      <body>
+        <input id="name" placeholder="Name" />
+        <button id="clicker" type="button">Click me</button>
+        <form id="demo-form">
+          <input id="email" name="email" value="" />
+          <button id="submitter" type="submit">Submit</button>
+        </form>
+        <select id="flavor">
+          <option value="vanilla">Vanilla</option>
+          <option value="chocolate">Chocolate</option>
+        </select>
+        <script>
+          const setTitle = (value) => { document.title = value; };
+          document.querySelector('#name')?.addEventListener('input', (event) => setTitle('Typed:' + event.target.value));
+          document.querySelector('#email')?.addEventListener('input', (event) => setTitle('Typed:' + event.target.value));
+          document.querySelector('#clicker')?.addEventListener('click', () => setTitle('Clicked'));
+          document.querySelector('#demo-form')?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            setTitle('Submitted:' + document.querySelector('#email').value);
+          });
+          document.querySelector('#flavor')?.addEventListener('change', (event) => setTitle('Selected:' + event.target.value));
+          let scrollTick;
+          window.addEventListener('scroll', () => {
+            window.clearTimeout(scrollTick);
+            scrollTick = window.setTimeout(() => setTitle('Scrolled'), 25);
+          });
+        </script>
+      </body>
+    </html>
+  `;
+  return `data:text/html,${encodeURIComponent(html)}`;
 }
 
 test("/browser open opens the visible browser companion and emits browser timeline rows", async () => {
@@ -134,6 +187,83 @@ test("common natural-language browser intents route into the same browser comman
     await submitComposerText(window, "show the browser");
     await expect(window.getByTestId("transcript")).toContainText("show the browser");
     await expectBrowserTitle(window, "Natural Language");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("interactive browser commands ask for approval and act on the visible browser session", async () => {
+  test.setTimeout(30_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeGitWorkspace("browser-interactive-workspace");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Browser interactive test");
+
+    await submitComposerText(window, `/browser open ${interactiveBrowserPageUrl()}`);
+    await expectBrowserTitle(window, "Interactive Ready");
+
+    await submitComposerText(window, `/browser type "#name" "Ava"`);
+    await approveBrowserAutomation(window);
+    await expectBrowserTitle(window, "Typed:Ava");
+    await expectTranscriptToContainToolLabel(window, "Type in browser companion element");
+
+    await submitComposerText(window, `/browser click "#clicker"`);
+    await approveBrowserAutomation(window);
+    await expectBrowserTitle(window, "Clicked");
+    await expectTranscriptToContainToolLabel(window, "Click browser companion element");
+
+    await submitComposerText(window, `/browser select "#flavor" "chocolate"`);
+    await approveBrowserAutomation(window);
+    await expectBrowserTitle(window, "Selected:chocolate");
+    await expectTranscriptToContainToolLabel(window, "Select browser companion option");
+
+    await submitComposerText(window, `/browser type "#email" "qa@example.com"`);
+    await approveBrowserAutomation(window);
+    await expectBrowserTitle(window, "Typed:qa@example.com");
+
+    await submitComposerText(window, `/browser submit "#demo-form"`);
+    await approveBrowserAutomation(window);
+    await expectBrowserTitle(window, "Submitted:qa@example.com");
+    await expectTranscriptToContainToolLabel(window, "Submit browser companion form");
+
+    await submitComposerText(window, "/browser scroll down");
+    await approveBrowserAutomation(window);
+    await expectBrowserTitle(window, "Scrolled");
+    await expectTranscriptToContainToolLabel(window, "Scroll browser companion page");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("allow full automation skips interactive browser approval prompts", async () => {
+  test.setTimeout(30_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeGitWorkspace("browser-interactive-policy-workspace");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Browser interactive policy test");
+
+    await window.keyboard.press(desktopShortcut(","));
+    await window.getByRole("button", { name: "Allow full automation" }).click();
+    await window.getByRole("button", { name: "Back" }).click();
+
+    await submitComposerText(window, `/browser open ${interactiveBrowserPageUrl()}`);
+    await expectBrowserTitle(window, "Interactive Ready");
+
+    await submitComposerText(window, `/browser click "#clicker"`);
+    await expect(window.getByTestId("browser-automation-dialog")).toHaveCount(0);
+    await expectBrowserTitle(window, "Clicked");
   } finally {
     await harness.close();
   }

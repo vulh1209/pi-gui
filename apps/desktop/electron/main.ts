@@ -267,6 +267,8 @@ app.whenReady().then(async () => {
     (sessionRef, item) => store.appendLocalToolActivity(sessionRef, item),
     () => store.selectedSessionRef(),
     () => mainWindow,
+    () => store.state.browserAutomationPolicy,
+    (confirmation) => store.setBrowserAutomationConfirmation(confirmation),
   );
   store = new DesktopAppStore({
     userDataDir,
@@ -409,6 +411,10 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle(desktopIpc.browserPanelReload, () => {
     browserPanel?.reload();
+  });
+  ipcMain.handle(desktopIpc.respondToBrowserAutomationConfirmation, async (_event, requestId: string, approved: boolean) => {
+    await browserAutomationBridge.respond(requestId, approved);
+    return store.getState();
   });
   ipcMain.handle(desktopIpc.refreshRuntime, (_event, workspaceId?: string) => store.refreshRuntime(workspaceId));
   ipcMain.handle(desktopIpc.setModelSettingsScopeMode, (_event, mode) => store.setModelSettingsScopeMode(mode));

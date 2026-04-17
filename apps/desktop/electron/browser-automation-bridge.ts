@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { SessionRef } from "@pi-gui/session-driver";
+import type { BrowserAutomationConfirmation, BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { BrowserHostAction } from "../src/browser-command-routing";
 import type { TranscriptMessage } from "../src/desktop-state";
-import { makeToolItem } from "./app-store-utils";
+import { makeActivityItem, makeToolItem } from "./app-store-utils";
 import { BrowserPanelManager } from "./browser-panel-manager";
 
 export class BrowserAutomationBridge {
+  private readonly pendingConfirmations = new Map<string, (approved: boolean) => void>();
+
   constructor(
     private readonly panel: BrowserPanelManager,
     private readonly appendTimelineRow: (sessionRef: SessionRef, item: TranscriptMessage) => void,
     private readonly getSelectedSessionRef: () => SessionRef | undefined,
     private readonly getMainWindow: () => Electron.BrowserWindow | null,
+    private readonly getPolicy: () => BrowserAutomationPolicy,
+    private readonly publishConfirmation: (confirmation: BrowserAutomationConfirmation | undefined) => Promise<void> | void,
   ) {}
 
   async run(action: BrowserHostAction): Promise<void> {
@@ -27,18 +32,14 @@ export class BrowserAutomationBridge {
         await this.panel.show(window, workspaceId, this.panel.getBounds() ?? undefined);
         this.panel.focus();
       });
-      if (action.url) {
-        await this.runStep(sessionRef, "Navigate browser companion", async () => {
-          await this.panel.navigate(action.url as string);
-        }, action.url);
-      }
+      await this.maybeNavigateAfterOpen(sessionRef, action.url);
       return;
     }
 
     if (action.name === "navigate") {
       await this.panel.show(window, workspaceId, this.panel.getBounds() ?? undefined);
       await this.runStep(sessionRef, "Navigate browser companion", async () => {
-        await this.panel.navigate(action.url as string);
+        await this.panel.navigate(action.url);
       }, action.url);
       return;
     }
@@ -52,22 +53,102 @@ export class BrowserAutomationBridge {
     }
 
     await this.panel.show(window, workspaceId, this.panel.getBounds() ?? undefined);
-    if (action.name === "back") {
-      await this.runStep(sessionRef, "Go back in browser companion", async () => {
-        this.panel.goBack();
-      });
+
+    if (isInteractiveAction(action)) {
+      await this.confirmIfNeeded(sessionRef, action);
+    }
+
+    switch (action.name) {
+      case "back":
+        await this.runStep(sessionRef, "Go back in browser companion", async () => {
+          this.panel.goBack();
+        });
+        return;
+      case "forward":
+        await this.runStep(sessionRef, "Go forward in browser companion", async () => {
+          this.panel.goForward();
+        });
+        return;
+      case "reload":
+        await this.runStep(sessionRef, "Reload browser companion", async () => {
+          this.panel.reload();
+        });
+        return;
+      case "click":
+        await this.runStep(sessionRef, "Click browser companion element", async () => {
+          await this.panel.click(action.selector);
+        }, action.selector);
+        return;
+      case "type":
+        await this.runStep(sessionRef, "Type in browser companion element", async () => {
+          await this.panel.type(action.selector, action.text);
+        }, `${action.selector} ← ${action.text}`);
+        return;
+      case "submit":
+        await this.runStep(sessionRef, "Submit browser companion form", async () => {
+          await this.panel.submit(action.selector);
+        }, action.selector);
+        return;
+      case "scroll":
+        await this.runStep(sessionRef, "Scroll browser companion page", async () => {
+          await this.panel.scroll(action.target);
+        }, action.target);
+        return;
+      case "select":
+        await this.runStep(sessionRef, "Select browser companion option", async () => {
+          await this.panel.select(action.selector, action.value);
+        }, `${action.selector} ← ${action.value}`);
+        return;
+      default:
+        return;
+    }
+  }
+
+  async respond(requestId: string, approved: boolean): Promise<void> {
+    const resolve = this.pendingConfirmations.get(requestId);
+    if (!resolve) {
+      throw new Error("Browser automation confirmation is no longer pending.");
+    }
+    this.pendingConfirmations.delete(requestId);
+    await this.publishConfirmation(undefined);
+    resolve(approved);
+  }
+
+  private async maybeNavigateAfterOpen(sessionRef: SessionRef, url?: string): Promise<void> {
+    if (!url) {
       return;
     }
-    if (action.name === "forward") {
-      await this.runStep(sessionRef, "Go forward in browser companion", async () => {
-        this.panel.goForward();
-      });
+    await this.runStep(sessionRef, "Navigate browser companion", async () => {
+      await this.panel.navigate(url);
+    }, url);
+  }
+
+  private async confirmIfNeeded(sessionRef: SessionRef, action: InteractiveBrowserAction): Promise<void> {
+    if (!requiresInteractiveConfirmation(this.getPolicy())) {
       return;
     }
-    if (action.name === "reload") {
-      await this.runStep(sessionRef, "Reload browser companion", async () => {
-        this.panel.reload();
-      });
+
+    const confirmation = buildConfirmation(action, this.panel.currentUrl());
+    this.appendTimelineRow(
+      sessionRef,
+      makeActivityItem(`Waiting for confirmation: ${confirmation.actionLabel}`, {
+        ...(confirmation.detail ? { detail: confirmation.detail } : {}),
+        ...(confirmation.site ? { metadata: confirmation.site } : {}),
+      }),
+    );
+    await this.publishConfirmation(confirmation);
+    const approved = await new Promise<boolean>((resolve) => {
+      this.pendingConfirmations.set(confirmation.requestId, resolve);
+    });
+    if (!approved) {
+      this.appendTimelineRow(
+        sessionRef,
+        makeActivityItem(`Cancelled browser action: ${confirmation.actionLabel}`, {
+          ...(confirmation.detail ? { detail: confirmation.detail } : {}),
+          tone: "warning",
+        }),
+      );
+      throw new Error("Browser action cancelled.");
     }
   }
 
@@ -87,6 +168,75 @@ export class BrowserAutomationBridge {
   }
 }
 
+type InteractiveBrowserAction = Extract<
+  BrowserHostAction,
+  { readonly name: "click" | "type" | "submit" | "scroll" | "select" }
+>;
+
+function isInteractiveAction(action: BrowserHostAction): action is InteractiveBrowserAction {
+  return (
+    action.name === "click" ||
+    action.name === "type" ||
+    action.name === "submit" ||
+    action.name === "scroll" ||
+    action.name === "select"
+  );
+}
+
+function requiresInteractiveConfirmation(policy: BrowserAutomationPolicy): boolean {
+  return policy === "ask-every-time" || policy === "allow-navigation-read";
+}
+
+function buildConfirmation(
+  action: InteractiveBrowserAction,
+  currentUrl: string | undefined,
+): BrowserAutomationConfirmation {
+  const site = siteLabelForUrl(currentUrl);
+  if (action.name === "click") {
+    return {
+      requestId: randomUUID(),
+      actionLabel: "Click browser element",
+      detail: action.selector,
+      site,
+      message: "Allow the browser companion to click the selected page element?",
+    };
+  }
+  if (action.name === "type") {
+    return {
+      requestId: randomUUID(),
+      actionLabel: "Type in browser element",
+      detail: `${action.selector} ← ${action.text}`,
+      site,
+      message: "Allow the browser companion to type into the selected page element?",
+    };
+  }
+  if (action.name === "submit") {
+    return {
+      requestId: randomUUID(),
+      actionLabel: "Submit browser form",
+      detail: action.selector,
+      site,
+      message: "Allow the browser companion to submit the selected form or button?",
+    };
+  }
+  if (action.name === "scroll") {
+    return {
+      requestId: randomUUID(),
+      actionLabel: "Scroll browser page",
+      detail: action.target,
+      site,
+      message: "Allow the browser companion to scroll the current page?",
+    };
+  }
+  return {
+    requestId: randomUUID(),
+    actionLabel: "Select browser option",
+    detail: `${action.selector} ← ${action.value}`,
+    site,
+    message: "Allow the browser companion to change the selected option?",
+  };
+}
+
 function makeBrowserToolItem(
   status: "success" | "error",
   label: string,
@@ -100,4 +250,16 @@ function makeBrowserToolItem(
 function formatBrowserError(error: unknown, detail?: string): string {
   const message = error instanceof Error ? error.message : String(error);
   return detail ? `${detail} · ${message}` : message;
+}
+
+function siteLabelForUrl(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.host || parsed.protocol.replace(/:$/, "");
+  } catch {
+    return undefined;
+  }
 }

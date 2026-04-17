@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { BrowserPanelState } from "./browser-panel-state";
+import type { BrowserAutomationConfirmation, BrowserPanelState } from "./browser-panel-state";
 
 interface BrowserPanelProps {
   readonly panel: BrowserPanelState;
@@ -58,5 +58,35 @@ export function BrowserPanel({
         {!panel.url ? <div className="browser-panel__empty">Paste a URL to start browsing</div> : null}
       </div>
     </aside>
+  );
+}
+
+export function BrowserAutomationDialog({
+  confirmation,
+  onRespond,
+}: {
+  readonly confirmation: BrowserAutomationConfirmation;
+  readonly onRespond: (approved: boolean) => void;
+}) {
+  return (
+    <div className="extension-dialog-backdrop">
+      <div className="extension-dialog" data-testid="browser-automation-dialog">
+        <div className="extension-dialog__title">Browser automation approval</div>
+        <p className="extension-dialog__body">{confirmation.message}</p>
+        <div className="browser-automation-dialog__details">
+          <div><strong>Action:</strong> {confirmation.actionLabel}</div>
+          {confirmation.site ? <div><strong>Site:</strong> {confirmation.site}</div> : null}
+          {confirmation.detail ? <div><strong>Detail:</strong> {confirmation.detail}</div> : null}
+        </div>
+        <div className="extension-dialog__actions">
+          <button className="button button--secondary" type="button" onClick={() => onRespond(false)}>
+            Cancel
+          </button>
+          <button className="button button--primary" type="button" onClick={() => onRespond(true)}>
+            Allow once
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

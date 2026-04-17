@@ -1,9 +1,26 @@
-export type BrowserHostActionName = "open" | "focus" | "navigate" | "back" | "forward" | "reload";
+export type BrowserHostActionName =
+  | "open"
+  | "focus"
+  | "navigate"
+  | "back"
+  | "forward"
+  | "reload"
+  | "click"
+  | "type"
+  | "submit"
+  | "scroll"
+  | "select";
 
-export interface BrowserHostAction {
-  readonly name: BrowserHostActionName;
-  readonly url?: string;
-}
+export type BrowserScrollTarget = "up" | "down" | "top" | "bottom";
+
+export type BrowserHostAction =
+  | { readonly name: "open" | "navigate"; readonly url: string }
+  | { readonly name: "focus" | "back" | "forward" | "reload" }
+  | { readonly name: "click"; readonly selector: string }
+  | { readonly name: "type"; readonly selector: string; readonly text: string }
+  | { readonly name: "submit"; readonly selector: string }
+  | { readonly name: "scroll"; readonly target: BrowserScrollTarget }
+  | { readonly name: "select"; readonly selector: string; readonly value: string };
 
 const BROWSER_COMMAND = "/browser";
 const COMMON_BROWSER_TARGETS: Readonly<Record<string, string>> = {
@@ -30,8 +47,19 @@ const RELOAD_BROWSER_PATTERNS = [
   /^reload\s+the\s+current\s+browser\s+page$/i,
 ] as const;
 
-export const BROWSER_SLASH_USAGE =
-  "Use /browser open <url>, /browser navigate <url>, /browser focus, /browser back, /browser forward, or /browser reload.";
+export const BROWSER_SLASH_USAGE = [
+  "Use /browser open <url>",
+  "/browser navigate <url>",
+  "/browser focus",
+  "/browser back",
+  "/browser forward",
+  "/browser reload",
+  "/browser click <selector>",
+  "/browser type <selector> <text>",
+  "/browser submit <selector>",
+  "/browser scroll <up|down|top|bottom>",
+  "/browser select <selector> <value>",
+].join(", ");
 
 export function isBrowserSlashCommand(text: string): boolean {
   return /^\/browser(?:\s|$)/i.test(text.trim());
@@ -43,25 +71,47 @@ export function parseBrowserSlashCommand(text: string): BrowserHostAction | unde
     return undefined;
   }
 
-  const [, rawVerb, ...rest] = trimmed.split(/\s+/);
-  const verb = rawVerb?.toLowerCase();
+  const tokens = tokenizeBrowserCommand(trimmed);
+  const verb = tokens[1]?.toLowerCase();
   if (!verb) {
     return undefined;
   }
 
   if (verb === "open" || verb === "navigate") {
-    const target = rest.join(" ").trim();
+    const target = tokens.slice(2).join(" ").trim();
     const url = normalizeBrowserUrl(target);
-    return url
-      ? {
-          name: verb === "open" ? "open" : "navigate",
-          url,
-        }
-      : undefined;
+    return url ? { name: verb === "open" ? "open" : "navigate", url } : undefined;
   }
 
   if (verb === "focus" || verb === "back" || verb === "forward" || verb === "reload") {
     return { name: verb };
+  }
+
+  if (verb === "click") {
+    const selector = tokens[2]?.trim();
+    return selector ? { name: "click", selector } : undefined;
+  }
+
+  if (verb === "type") {
+    const selector = tokens[2]?.trim();
+    const typedText = tokens.slice(3).join(" ").trim();
+    return selector && typedText ? { name: "type", selector, text: typedText } : undefined;
+  }
+
+  if (verb === "submit") {
+    const selector = tokens[2]?.trim();
+    return selector ? { name: "submit", selector } : undefined;
+  }
+
+  if (verb === "scroll") {
+    const target = tokens[2]?.trim().toLowerCase();
+    return isBrowserScrollTarget(target) ? { name: "scroll", target } : undefined;
+  }
+
+  if (verb === "select") {
+    const selector = tokens[2]?.trim();
+    const value = tokens.slice(3).join(" ").trim();
+    return selector && value ? { name: "select", selector, value } : undefined;
   }
 
   return undefined;
@@ -121,6 +171,23 @@ export function normalizeBrowserUrl(value: string | undefined): string | undefin
   }
 
   return undefined;
+}
+
+function tokenizeBrowserCommand(value: string): string[] {
+  const tokens: string[] = [];
+  const matcher = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+  for (const match of value.matchAll(matcher)) {
+    const token = match[1] ?? match[2] ?? match[3];
+    if (!token) {
+      continue;
+    }
+    tokens.push(token.replace(/\\(["'\\])/g, "$1"));
+  }
+  return tokens;
+}
+
+function isBrowserScrollTarget(value: string | undefined): value is BrowserScrollTarget {
+  return value === "up" || value === "down" || value === "top" || value === "bottom";
 }
 
 function isLoopbackTarget(value: string): boolean {

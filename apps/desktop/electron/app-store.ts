@@ -33,7 +33,7 @@ import type {
   RuntimeSettingsSnapshot,
   RuntimeSnapshot,
 } from "@pi-gui/session-driver/runtime-types";
-import type { BrowserAutomationPolicy, BrowserPanelState } from "../src/browser-panel-state";
+import type { BrowserAutomationConfirmation, BrowserAutomationPolicy, BrowserPanelState } from "../src/browser-panel-state";
 import type { BrowserHostAction } from "../src/browser-command-routing";
 import {
   type AppView,
@@ -1167,6 +1167,18 @@ export class DesktopAppStore implements AppStoreInternals {
     this.sessionState.transcriptCache.set(key, transcript);
     this.persistTranscriptCacheForSession(sessionRef);
     this.publishSelectedTranscriptFor(sessionRef);
+  }
+
+  async setBrowserAutomationConfirmation(
+    confirmation: BrowserAutomationConfirmation | undefined,
+  ): Promise<void> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserAutomationConfirmation: confirmation,
+      revision: this.state.revision + 1,
+    };
+    this.emit();
   }
 
   getLearnedRuntimeCommandCompatibility(

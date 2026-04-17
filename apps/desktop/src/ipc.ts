@@ -62,6 +62,7 @@ export const desktopIpc = {
   browserPanelBack: "pi-gui:browser-panel-back",
   browserPanelForward: "pi-gui:browser-panel-forward",
   browserPanelReload: "pi-gui:browser-panel-reload",
+  respondToBrowserAutomationConfirmation: "pi-gui:respond-to-browser-automation-confirmation",
   refreshRuntime: "pi-gui:refresh-runtime",
   setModelSettingsScopeMode: "pi-gui:set-model-settings-scope-mode",
   setDefaultModel: "pi-gui:set-default-model",
@@ -180,6 +181,7 @@ export interface PiDesktopApi {
   browserPanelBack(): Promise<void>;
   browserPanelForward(): Promise<void>;
   browserPanelReload(): Promise<void>;
+  respondToBrowserAutomationConfirmation(requestId: string, approved: boolean): Promise<DesktopAppState>;
   refreshRuntime(workspaceId?: string): Promise<DesktopAppState>;
   setModelSettingsScopeMode(mode: ModelSettingsScopeMode): Promise<DesktopAppState>;
   setDefaultModel(workspaceId: string, provider: string, modelId: string): Promise<DesktopAppState>;

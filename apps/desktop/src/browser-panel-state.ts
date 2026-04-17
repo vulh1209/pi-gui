@@ -5,6 +5,14 @@ export type BrowserAutomationPolicy =
   | "allow-navigation-read"
   | "allow-full-automation";
 
+export interface BrowserAutomationConfirmation {
+  readonly requestId: string;
+  readonly actionLabel: string;
+  readonly detail?: string;
+  readonly site?: string;
+  readonly message: string;
+}
+
 export interface BrowserPanelState {
   readonly mode: BrowserPanelMode;
   readonly workspaceId?: string;
