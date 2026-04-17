@@ -46,7 +46,7 @@ test("loads npm-installed extension commands from a reduced GUI environment", as
     const composer = window.getByTestId("composer");
     await composer.fill("/pi-mo");
 
-    await expect(window.getByTestId("slash-menu")).toContainText("pi-mode");
+    await expect(window.getByTestId("slash-menu")).toHaveCount(0);
     await expect
       .poll(
         async () => {
@@ -57,6 +57,12 @@ test("loads npm-installed extension commands from a reduced GUI environment", as
         { timeout: 15_000 },
       )
       .toBe(true);
+
+    await window.getByRole("button", { name: "Extensions", exact: true }).click();
+    await expect(window.getByTestId("extensions-surface")).toBeVisible();
+    await window.getByTestId("extensions-list").getByRole("button", { name: /pi-modes/i }).click();
+    await window.getByRole("tab", { name: "Configure", exact: true }).click();
+    await expect(window.locator(".skill-detail")).toContainText("Pi Mode");
   } finally {
     await harness.close();
   }

@@ -115,6 +115,7 @@ test("fails fast for unsupported handoff-like commands and learns terminal-only 
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
     await expect(window.getByTestId("extensions-surface")).toBeVisible();
     await window.getByTestId("extensions-list").getByRole("button", { name: /compatibility-extension/i }).click();
+    await window.getByRole("tab", { name: "Diagnostics", exact: true }).click();
     await expect(window.locator(".skill-detail")).toContainText("handoff-gui-test · Terminal-only");
     await expect(window.locator(".skill-detail")).toContainText("prefill-safe · GUI-compatible");
   } finally {
