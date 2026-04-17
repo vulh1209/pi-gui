@@ -19,6 +19,9 @@ export function BrowserPanel({
   viewportRef,
 }: BrowserPanelProps) {
   const [draft, setDraft] = useState(panel.url);
+  const siteLabel = browserPanelSiteLabel(panel.url);
+  const sessionLabel = panel.loading ? "Loading" : panel.url ? "Live session" : "Ready";
+  const title = panel.title || (panel.loading ? "Loading…" : "Ready to browse");
 
   useEffect(() => {
     setDraft(panel.url);
@@ -27,9 +30,19 @@ export function BrowserPanel({
   return (
     <aside className={`browser-panel browser-panel--${panel.mode}`} data-testid="browser-panel">
       <div className="browser-panel__header">
-        <div>
+        <div className="browser-panel__eyebrow-row">
           <div className="chat-header__eyebrow">Browser companion</div>
-          <h2 className="browser-panel__title">{panel.title || (panel.loading ? "Loading…" : "Ready to browse")}</h2>
+          <div className="browser-panel__session-chip">{sessionLabel}</div>
+        </div>
+        <div className="browser-panel__title-row">
+          <div>
+            <h2 className="browser-panel__title">{title}</h2>
+            <div className="browser-panel__subtitle">{siteLabel || "Use the same workspace browser session for search, login, and follow-up actions."}</div>
+          </div>
+          <div className="browser-panel__meta-chips">
+            {siteLabel ? <div className="browser-panel__site-chip">{siteLabel}</div> : null}
+            <div className="browser-panel__trust-chip">Workspace scoped</div>
+          </div>
         </div>
       </div>
       <form
@@ -55,7 +68,16 @@ export function BrowserPanel({
         />
       </form>
       <div className="browser-panel__viewport" ref={viewportRef}>
-        {!panel.url ? <div className="browser-panel__empty">Paste a URL to start browsing</div> : null}
+        {!panel.url ? (
+          <div className="browser-panel__empty">
+            <div className="browser-panel__empty-card">
+              <div className="browser-panel__empty-title">Open a page in the companion browser</div>
+              <div className="browser-panel__empty-body">
+                Paste a URL, run <code>/browser open https://example.com</code>, or ask pi to search in the same visible browser session.
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </aside>
   );
@@ -89,4 +111,20 @@ export function BrowserAutomationDialog({
       </div>
     </div>
   );
+}
+
+function browserPanelSiteLabel(url: string): string {
+  if (!url) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "data:") {
+      return "In-app page";
+    }
+    return parsed.host || parsed.protocol.replace(/:$/, "");
+  } catch {
+    return url;
+  }
 }
