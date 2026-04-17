@@ -36,11 +36,19 @@ test("renders Tungdev pi-mode as a native settings surface in Extensions and upd
 
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
     await expect(window.getByTestId("extensions-surface")).toBeVisible();
+    await expect(window.getByTestId("extensions-accordion")).toBeVisible();
 
-    await window.getByTestId("extensions-list").getByRole("button", { name: /pi-modes/i }).click();
+    const packageGroup = window.getByRole("button", { name: /@tungthedev\/pi-extensions/i }).first();
+    await expect(packageGroup).toHaveAttribute("aria-expanded", "true");
+
+    const piModesRow = window.getByRole("button", { name: /pi-modes/i }).first();
+    await expect(piModesRow).toHaveAttribute("aria-expanded", "false");
+    await piModesRow.click();
+    await expect(piModesRow).toHaveAttribute("aria-expanded", "true");
+    const detail = window.locator(".extension-inline-surface");
+    await expect(detail).toContainText("Pi Mode");
+
     await window.getByRole("tab", { name: "Configure", exact: true }).click();
-
-    const detail = window.locator(".skill-detail");
     await expect(detail).toContainText("Pi Mode");
     await expect(detail).toContainText("Mode");
     await expect(detail).toContainText("Inject SYSTEM.md");
@@ -51,6 +59,14 @@ test("renders Tungdev pi-mode as a native settings surface in Extensions and upd
     await expect
       .poll(() => readPiModeToolSet(window, workspace.id), { timeout: 30_000 })
       .toBe("codex");
+
+    await piModesRow.click();
+    await expect(piModesRow).toHaveAttribute("aria-expanded", "false");
+    await expect(window.locator(".extension-inline-surface")).toHaveCount(0);
+
+    await piModesRow.click();
+    await expect(piModesRow).toHaveAttribute("aria-expanded", "true");
+    await expect(window.locator(".extension-inline-surface")).toContainText("Pi Mode");
   } finally {
     await harness.close();
   }
@@ -88,10 +104,11 @@ test("keeps pi-mode out of chat by default and shows it again after a global cha
 
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
     await expect(window.getByTestId("extensions-surface")).toBeVisible();
-    await window.getByTestId("extensions-list").getByRole("button", { name: /pi-modes/i }).click();
+    const piModesRow = window.getByRole("button", { name: /pi-modes/i }).first();
+    await piModesRow.click();
     await window.getByRole("tab", { name: "Commands", exact: true }).click();
 
-    const detail = window.locator(".skill-detail");
+    const detail = window.locator(".extension-inline-surface");
     await expect(detail).toContainText("/pi-mode");
     const piModeCommand = detail.locator(".skill-detail__meta-label", { hasText: "/pi-mode" }).locator("xpath=..");
     await piModeCommand.getByRole("button", { name: "Chat", exact: true }).click();

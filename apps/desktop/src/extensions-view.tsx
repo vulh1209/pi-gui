@@ -86,7 +86,7 @@ export function ExtensionsView({
     }
 
     const activePaths = new Set(activeGroup.extensions.map((extension) => extension.path));
-    if (!expandedExtensionPath || !activePaths.has(expandedExtensionPath)) {
+    if (expandedExtensionPath && !activePaths.has(expandedExtensionPath)) {
       setExpandedExtensionPath(activeGroup.extensions[0]?.path);
     }
   }, [activeGroup, expandedExtensionPath]);
