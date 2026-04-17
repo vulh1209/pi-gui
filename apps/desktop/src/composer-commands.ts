@@ -243,6 +243,11 @@ export function buildSlashCommandSections(
   } = {},
 ): readonly ComposerSlashCommandSection[] {
   const normalizedQuery = query.trim().toLowerCase();
+  const allowTreeCommand = options.allowTreeCommand ?? true;
+  if (!allowTreeCommand && normalizedQuery === "/tree") {
+    return [];
+  }
+
   const availableRuntimeCommands = resolveRuntimeCommands(runtime, sessionCommands);
   const compatibilityByKey = new Map(
     compatibilityRecords.map((record) => [`${record.extensionPath}::${record.commandName}`, record] as const),
@@ -262,7 +267,6 @@ export function buildSlashCommandSections(
       compatibility: compatibilityByKey.get(`${command.sourceInfo.path}::${command.name}`),
     }))
     .filter((command) => matchesCommand(command, normalizedQuery));
-  const allowTreeCommand = options.allowTreeCommand ?? true;
   const hostMatches = HOST_ACTION_SLASH_COMMANDS.filter(
     (command) => (allowTreeCommand || command.kind !== "tree") && matchesCommand(command, normalizedQuery),
   );

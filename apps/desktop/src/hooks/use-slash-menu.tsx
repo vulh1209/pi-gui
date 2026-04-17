@@ -125,7 +125,7 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
     onSelectLogoutProvider,
   } = params;
 
-  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashIndexOverride, setSlashIndexOverride] = useState<number | null>(null);
   const [slashOptionIndex, setSlashOptionIndex] = useState(0);
   const [activeSlashFlow, setActiveSlashFlow] = useState<ActiveSlashFlow | undefined>();
   const [slashMenuSuppressedDraft, setSlashMenuSuppressedDraft] = useState("");
@@ -140,6 +140,9 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
       : [];
   const slashSuggestions = flattenSlashSections(slashSections);
   const exactSlashCommand = slashSuggestions.find((cmd) => isExactSlashCommand(slashQuery, cmd));
+  const preferredSlashCommandIndex = findPreferredSlashCommandIndex(slashSuggestions, slashQuery);
+  const preferredSlashCommand =
+    preferredSlashCommandIndex >= 0 ? slashSuggestions[preferredSlashCommandIndex] : undefined;
   const activeSlashOptionCommand =
     activeSlashFlow?.command ?? (exactSlashCommand?.submitMode === "pick-option" ? exactSlashCommand : undefined);
   const showSlashMenu =
@@ -148,7 +151,11 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
     !activeSlashOptionCommand &&
     composerDraft !== slashMenuSuppressedDraft &&
     slashSuggestions.length > 0;
-  const selectedSlashCommand = showSlashMenu ? slashSuggestions[slashIndex % slashSuggestions.length] : undefined;
+  const selectedSlashCommand = showSlashMenu
+    ? slashIndexOverride == null
+      ? preferredSlashCommand
+      : slashSuggestions[slashIndexOverride % slashSuggestions.length]
+    : undefined;
   const slashOptions =
     activeSlashOptionCommand?.kind === "model"
       ? buildModelOptions(selectedModelRuntime)
@@ -179,7 +186,7 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
   const selectedSlashOption = showSlashOptionMenu ? slashOptions[slashOptionIndex % slashOptions.length] : undefined;
 
   useEffect(() => {
-    setSlashIndex(0);
+    setSlashIndexOverride(null);
   }, [slashQuery]);
 
   useEffect(() => {
@@ -194,18 +201,21 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
         return;
       }
       setActiveSlashFlow(undefined);
+      setSlashIndexOverride(null);
       setSlashOptionIndex(0);
       return;
     }
 
     if (activeSlashFlow?.command && slashQuery.trim().length > activeSlashFlow.command.command.length) {
       setActiveSlashFlow(undefined);
+      setSlashIndexOverride(null);
       setSlashOptionIndex(0);
     }
   }, [activeSlashFlow, activeSlashQuery, slashQuery]);
 
   useEffect(() => {
     setActiveSlashFlow(undefined);
+    setSlashIndexOverride(null);
     setSlashOptionIndex(0);
     setSlashMenuSuppressedDraft("");
   }, [selectedSessionKey]);
@@ -407,7 +417,16 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
 
     if (showSlashMenu && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
       event.preventDefault();
-      setSlashIndex((current) => nextMenuIndex(current, event.key === "ArrowDown" ? 1 : -1, slashSuggestions.length));
+      const currentIndex = selectedSlashCommand
+        ? slashSuggestions.findIndex((command) => command.id === selectedSlashCommand.id)
+        : preferredSlashCommandIndex;
+      setSlashIndexOverride(
+        nextMenuIndex(
+          currentIndex >= 0 ? currentIndex : 0,
+          event.key === "ArrowDown" ? 1 : -1,
+          slashSuggestions.length,
+        ),
+      );
       return true;
     }
 
@@ -443,4 +462,62 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
     handleSlashKeyDown,
     fillComposerFromSlash,
   };
+}
+
+function findPreferredSlashCommandIndex(
+  commands: readonly ComposerSlashCommand[],
+  slashQuery: string,
+): number {
+  let bestIndex = -1;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const [index, command] of commands.entries()) {
+    const score = scoreSlashCommand(command, slashQuery);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function scoreSlashCommand(command: ComposerSlashCommand, slashQuery: string): number {
+  const normalizedQuery = slashQuery.trim().toLowerCase();
+  const queryWithoutSlash = normalizedQuery.replace(/^\/+/, "").trim();
+  const normalizedCommand = command.command.toLowerCase();
+  const aliases = buildCommandAliases(command);
+
+  if (normalizedCommand === normalizedQuery) {
+    return 400;
+  }
+  if (normalizedCommand.startsWith(normalizedQuery)) {
+    return 300;
+  }
+  if (queryWithoutSlash && aliases.some((alias) => alias.startsWith(queryWithoutSlash))) {
+    return 200;
+  }
+  if (normalizedCommand.includes(normalizedQuery)) {
+    return 100;
+  }
+  if (queryWithoutSlash && aliases.some((alias) => alias.includes(queryWithoutSlash))) {
+    return 50;
+  }
+  return 0;
+}
+
+function buildCommandAliases(command: ComposerSlashCommand): readonly string[] {
+  const aliases = new Set<string>([
+    command.command.replace(/^\/+/, "").toLowerCase(),
+    command.title.toLowerCase(),
+    command.sourceLabel?.toLowerCase() ?? "",
+    command.compatibility?.status === "terminal-only" ? "terminal-only" : "",
+  ]);
+
+  if (command.runtimeCommand) {
+    aliases.add(command.runtimeCommand.name.toLowerCase());
+    aliases.add(command.runtimeCommand.name.replace(/^skill:/, "").toLowerCase());
+  }
+
+  return [...aliases].filter(Boolean);
 }
