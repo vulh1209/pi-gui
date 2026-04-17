@@ -5,8 +5,10 @@ dist/
 build/
 out/
 release/
+storybook-static/
 playwright-report/
 test-results/
+.superpowers/
 .claude/worktrees/
 .codex/worktrees/
 .DS_Store
