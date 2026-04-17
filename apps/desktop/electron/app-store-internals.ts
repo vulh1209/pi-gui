@@ -11,6 +11,7 @@ import type {
   TranscriptMessage,
   WorkspaceSessionTarget,
 } from "../src/desktop-state";
+import type { BrowserHostAction } from "../src/browser-command-routing";
 import type { PendingAutoTitle, QueuedComposerEditState, SessionStateMap } from "./session-state-map";
 import type { GitWorktreeManager } from "./worktree-manager";
 import type { JsonFileStore } from "./json-file-store";
@@ -50,6 +51,8 @@ export interface AppStoreInternals {
   ensureSessionSubscription(sessionRef: SessionRef): Promise<void>;
   ensureSessionSubscribed(sessionRef: SessionRef): Promise<void>;
   refreshSessionCommandsFor(sessionRef: SessionRef): Promise<void>;
+  runBrowserHostAction(action: BrowserHostAction): Promise<void>;
+  appendLocalToolActivity(sessionRef: SessionRef, item: TranscriptMessage): void;
   getLearnedRuntimeCommandCompatibility(
     workspaceId: string,
     command: RuntimeCommandRecord,

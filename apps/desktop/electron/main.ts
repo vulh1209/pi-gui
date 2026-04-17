@@ -17,6 +17,7 @@ import { initUpdateChecker } from "./update-checker";
 import { ThemeManager } from "./theme-manager";
 import { BrowserProfileRegistry } from "./browser-profile-registry";
 import { BrowserPanelManager } from "./browser-panel-manager";
+import { BrowserAutomationBridge } from "./browser-automation-bridge";
 import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
@@ -260,9 +261,17 @@ app.whenReady().then(async () => {
         reject: (error: Error) => void;
       }
     | undefined;
+  browserPanel = new BrowserPanelManager(browserProfiles, (state) => store.setBrowserPanelState(state));
+  const browserAutomationBridge = new BrowserAutomationBridge(
+    browserPanel,
+    (sessionRef, item) => store.appendLocalToolActivity(sessionRef, item),
+    () => store.selectedSessionRef(),
+    () => mainWindow,
+  );
   store = new DesktopAppStore({
     userDataDir,
     initialWorkspacePaths: resolveInitialWorkspacePaths(),
+    browserAutomationBridge,
     getWindow: () => mainWindow,
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
   });
@@ -302,7 +311,6 @@ app.whenReady().then(async () => {
   if (!isDev) {
     stopUpdateChecker = initUpdateChecker();
   }
-  browserPanel = new BrowserPanelManager(browserProfiles, (state) => store.setBrowserPanelState(state));
 
   ipcMain.handle(desktopIpc.ping, () =>
     devReloadMarkersEnabled ? `pi desktop ready:${MAIN_DEV_RELOAD_MARKER}` : "pi desktop ready",

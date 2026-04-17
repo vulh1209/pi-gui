@@ -34,6 +34,7 @@ import type {
   RuntimeSnapshot,
 } from "@pi-gui/session-driver/runtime-types";
 import type { BrowserAutomationPolicy, BrowserPanelState } from "../src/browser-panel-state";
+import type { BrowserHostAction } from "../src/browser-command-routing";
 import {
   type AppView,
   type ComposerAttachment,
@@ -94,6 +95,7 @@ import * as workspace from "./app-store-workspace";
 import * as worktree from "./app-store-worktree";
 import * as composer from "./app-store-composer";
 import { isSessionActivelyViewed } from "./session-visibility";
+import type { BrowserAutomationBridge } from "./browser-automation-bridge";
 
 type StateListener = (state: DesktopAppState) => void;
 type SelectedTranscriptListener = (payload: SelectedTranscriptRecord | null) => void;
@@ -120,6 +122,7 @@ function isPersistedTranscriptRecord(value: PersistedTranscriptStoreValue): valu
 export interface DesktopAppStoreOptions {
   readonly userDataDir: string;
   readonly initialWorkspacePaths: readonly string[];
+  readonly browserAutomationBridge: BrowserAutomationBridge;
   readonly getWindow?: () => BrowserWindow | null;
   readonly generateThreadTitleOverride?: (
     workspace: WorkspaceRef,
@@ -145,6 +148,7 @@ export class DesktopAppStore implements AppStoreInternals {
   private readonly reportedCompatibilityIssuesBySession = new Map<string, Set<string>>();
   private readonly initialWorkspacePaths: readonly string[];
   private readonly getWindow: () => BrowserWindow | null;
+  private readonly browserAutomationBridge: BrowserAutomationBridge;
   private persistUiStateTimer: NodeJS.Timeout | undefined;
   private readonly transcriptPersistTimers = new Map<string, NodeJS.Timeout>();
   private initPromise: Promise<void> | undefined;
@@ -168,6 +172,7 @@ export class DesktopAppStore implements AppStoreInternals {
     this.attachmentStore = new JsonFileStore<ComposerAttachment[]>(options.userDataDir, "attachments");
     this.initialWorkspacePaths = options.initialWorkspacePaths;
     this.getWindow = options.getWindow ?? (() => null);
+    this.browserAutomationBridge = options.browserAutomationBridge;
   }
 
   /* ── Lifecycle ──────────────────────────────────────────── */
@@ -1144,6 +1149,19 @@ export class DesktopAppStore implements AppStoreInternals {
 
   async refreshSessionCommandsFor(sessionRef: SessionRef): Promise<void> {
     await this.refreshSessionCommands(sessionRef);
+  }
+
+  async runBrowserHostAction(action: BrowserHostAction): Promise<void> {
+    await this.browserAutomationBridge.run(action);
+  }
+
+  appendLocalToolActivity(sessionRef: SessionRef, item: TranscriptMessage): void {
+    const key = sessionKey(sessionRef);
+    const transcript = [...(this.sessionState.transcriptCache.get(key) ?? [])];
+    transcript.push(cloneTranscriptMessage(item));
+    this.sessionState.transcriptCache.set(key, transcript);
+    this.persistTranscriptCacheForSession(sessionRef);
+    this.publishSelectedTranscriptFor(sessionRef);
   }
 
   getLearnedRuntimeCommandCompatibility(

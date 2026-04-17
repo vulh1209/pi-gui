@@ -87,6 +87,11 @@ export class BrowserPanelManager {
     this.view?.webContents.reload();
   }
 
+  focus(): void {
+    this.activeWindow?.focus();
+    this.view?.webContents.focus();
+  }
+
   async close(): Promise<void> {
     this.view?.setVisible(false);
     await this.publish({

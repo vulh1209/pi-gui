@@ -21,7 +21,8 @@ export type ComposerSlashCommandKind =
   | "login"
   | "logout"
   | "settings"
-  | "scoped-models";
+  | "scoped-models"
+  | "browser";
 
 export interface ComposerSlashCommand {
   readonly id: string;
@@ -85,9 +86,20 @@ const INCOMPLETE_COMMAND_MESSAGES: Readonly<Record<string, string>> = {
   "/scoped-models": "Open Enabled models from the slash menu or Settings.",
   "/settings": "Open Settings from the slash menu or Cmd+,.",
   "/thinking": "Choose a reasoning level from the slash menu before sending /thinking.",
+  "/browser": "Use /browser open https://example.com or choose Browser from the slash menu.",
 } as const;
 
 const HOST_ACTION_SLASH_COMMANDS: readonly ComposerSlashCommand[] = [
+  {
+    id: "host:browser",
+    kind: "browser",
+    command: "/browser",
+    template: "/browser open https://example.com",
+    title: "Browser",
+    description: "Open, focus, and navigate the browser companion",
+    submitMode: "prefill",
+    section: "host",
+  },
   {
     id: "host:model",
     kind: "model",

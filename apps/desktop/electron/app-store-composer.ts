@@ -10,6 +10,12 @@ import {
   parseComposerCommand,
   resolveRuntimeSlashCommand,
 } from "../src/composer-commands";
+import {
+  BROWSER_SLASH_USAGE,
+  isBrowserSlashCommand,
+  parseBrowserSlashCommand,
+  parseNaturalLanguageBrowserIntent,
+} from "../src/browser-command-routing";
 import { appendUserMessage, clearActiveAssistantMessage } from "./app-store-timeline";
 import {
   cloneComposerAttachments,
@@ -258,6 +264,8 @@ export async function submitComposer(
     return store.withError("Create or select a session before sending a message.");
   }
 
+  const key = sessionKey(sessionRef);
+
   const runtime = store.runtimeByWorkspace.get(sessionRef.workspaceId);
   const sessionCommands = store.sessionState.sessionCommandsBySession.get(sessionKey(sessionRef)) ?? [];
   const runtimeSlashCommand = hasRuntimeSlashCommand(text, runtime, sessionCommands);
@@ -272,7 +280,16 @@ export async function submitComposer(
     }
   }
 
-  const key = sessionKey(sessionRef);
+  const naturalLanguageBrowserAction = attachments.length === 0
+    ? parseNaturalLanguageBrowserIntent(text)
+    : undefined;
+  if (naturalLanguageBrowserAction) {
+    await store.runBrowserHostAction(naturalLanguageBrowserAction);
+    return finishComposerCommand(store, sessionRef, key, `Browser ${naturalLanguageBrowserAction.name}`, {
+      appendActivity: false,
+    });
+  }
+
   const selectedSession = store.sessionFromState(sessionRef);
   const isRunning = selectedSession?.status === "running";
   const editingState = store.getQueuedComposerEditState(sessionRef);
@@ -497,6 +514,19 @@ async function runComposerCommand(
   sessionRef: SessionRef,
   commandText: string,
 ): Promise<DesktopAppState | undefined> {
+  const browserAction = parseBrowserSlashCommand(commandText);
+  if (browserAction) {
+    const key = sessionKey(sessionRef);
+    await store.runBrowserHostAction(browserAction);
+    return finishComposerCommand(store, sessionRef, key, `Browser ${browserAction.name}`, {
+      appendActivity: false,
+    });
+  }
+
+  if (isBrowserSlashCommand(commandText)) {
+    return store.withError(BROWSER_SLASH_USAGE);
+  }
+
   const parsed = parseComposerCommand(commandText);
   if (!parsed) {
     const message = incompleteComposerCommandMessage(commandText);
@@ -579,10 +609,15 @@ function finishComposerCommand(
   sessionRef: SessionRef,
   key: string,
   label: string,
+  options: {
+    readonly appendActivity?: boolean;
+  } = {},
 ): DesktopAppState {
   store.sessionState.composerDraftsBySession.delete(key);
   store.sessionState.composerAttachmentsBySession.delete(key);
-  appendLocalActivity(store, sessionRef, label);
+  if (options.appendActivity ?? true) {
+    appendLocalActivity(store, sessionRef, label);
+  }
   const transcript = store.sessionState.transcriptCache.get(key) ?? [];
   const preview = previewFromTranscript(transcript);
   store.state = {
