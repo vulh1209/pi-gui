@@ -18,6 +18,7 @@ import { ThemeManager } from "./theme-manager";
 import { BrowserProfileRegistry } from "./browser-profile-registry";
 import { BrowserPanelManager } from "./browser-panel-manager";
 import { BrowserAutomationBridge } from "./browser-automation-bridge";
+import { createBrowserRuntimeTools } from "./browser-runtime-tools";
 import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
@@ -270,10 +271,35 @@ app.whenReady().then(async () => {
     () => store.state.browserAutomationPolicy,
     (confirmation) => store.setBrowserAutomationConfirmation(confirmation),
   );
+  const browserRuntimeTools = createBrowserRuntimeTools({
+    runBrowserActionSequence: async (context, actions) => {
+      const workspace = store.state.workspaces.find((entry) => entry.path === context.cwd);
+      if (!workspace) {
+        throw new Error(`No workspace is open for ${context.cwd}.`);
+      }
+      const session = workspace.sessions.find((entry) => entry.id === context.sessionId);
+      if (!session) {
+        throw new Error(`No active desktop session matches ${context.sessionId}.`);
+      }
+      const sessionRef = {
+        workspaceId: workspace.id,
+        sessionId: session.id,
+      };
+      for (const action of actions) {
+        await browserAutomationBridge.runForSession(sessionRef, action);
+      }
+    },
+    resolveContext: (ctx) => ({
+      cwd: ctx.cwd,
+      sessionId: ctx.sessionManager.getSessionId(),
+    }),
+    getRoutingMode: () => store.state.browserWebTaskRoutingMode,
+  });
   store = new DesktopAppStore({
     userDataDir,
     initialWorkspacePaths: resolveInitialWorkspacePaths(),
     browserAutomationBridge,
+    customAgentTools: browserRuntimeTools,
     getWindow: () => mainWindow,
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
   });

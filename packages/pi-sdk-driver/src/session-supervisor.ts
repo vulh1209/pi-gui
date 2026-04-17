@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   ModelRegistry,
   SessionManager,
+  type ToolDefinition,
   type AgentSession,
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
@@ -75,6 +76,7 @@ export interface PiSdkDriverOptions {
   readonly catalogFilePath?: string;
   readonly createAgentSessionImpl?: (options?: CreateAgentSessionOptions) => Promise<{ session: AgentSession }>;
   readonly modelRegistry?: ModelRegistry;
+  readonly customTools?: readonly ToolDefinition[];
   readonly generateThreadTitleOverride?: (
     workspace: WorkspaceRef,
     options: import("./thread-title-generator.js").GenerateThreadTitleOptions,
@@ -143,6 +145,7 @@ export class SessionSupervisor {
   private readonly catalogs: SessionFileCatalogStorage;
   private readonly createAgentSessionImpl: (options?: CreateAgentSessionOptions) => Promise<{ session: AgentSession }>;
   private readonly modelRegistry: ModelRegistry | undefined;
+  private readonly customTools: readonly ToolDefinition[];
   private readonly records = new Map<string, ManagedSessionRecord>();
 
   constructor(options: PiSdkDriverOptions = {}) {
@@ -151,6 +154,7 @@ export class SessionSupervisor {
       : new JsonCatalogStore();
     this.createAgentSessionImpl = options.createAgentSessionImpl ?? ((createOptions) => createAgentSessionWithNpmFallback(createOptions));
     this.modelRegistry = options.modelRegistry;
+    this.customTools = options.customTools ?? [];
   }
 
   listWorkspaces(): Promise<WorkspaceCatalogSnapshot> {
@@ -297,6 +301,7 @@ export class SessionSupervisor {
       cwd: workspace.path,
       sessionManager: SessionManager.create(workspace.path),
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
+      ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     };
     if (initialModel) {
       createOptions.model = initialModel;
@@ -646,6 +651,7 @@ export class SessionSupervisor {
       cwd: workspace.path,
       sessionManager: SessionManager.open(sessionFile),
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
+      ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     });
 
     const record = existing ?? this.createRecord(workspaceToRef(workspace), session, sessionEntry.title);

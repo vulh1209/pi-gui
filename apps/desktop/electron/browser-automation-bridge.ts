@@ -20,9 +20,17 @@ export class BrowserAutomationBridge {
 
   async run(action: BrowserHostAction): Promise<void> {
     const sessionRef = this.getSelectedSessionRef();
-    const window = this.getMainWindow();
-    if (!sessionRef || !window) {
+    if (!sessionRef) {
       throw new Error("Browser companion requires an active session.");
+    }
+
+    await this.runForSession(sessionRef, action);
+  }
+
+  async runForSession(sessionRef: SessionRef, action: BrowserHostAction): Promise<void> {
+    const window = this.getMainWindow();
+    if (!window) {
+      throw new Error("Browser companion requires a main window.");
     }
 
     const workspaceId = sessionRef.workspaceId;
