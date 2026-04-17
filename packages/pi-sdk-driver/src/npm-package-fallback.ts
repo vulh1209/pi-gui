@@ -78,6 +78,7 @@ export async function createAgentSessionWithNpmFallback(options?: CreateAgentSes
 
     return createAgentSession({
       ...options,
+      cwd,
       agentDir,
       settingsManager: fallbackSettingsManager,
       resourceLoader,

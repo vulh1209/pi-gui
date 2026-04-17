@@ -154,6 +154,10 @@ export async function retryWithRecoveredNpmCommand<T>(options: {
         command,
       };
     } catch (error) {
+      if (!isRecoverableNpmCommandError(error)) {
+        throw error;
+      }
+
       attempts.push({
         command,
         error: error instanceof Error ? error.message : String(error),
@@ -168,4 +172,9 @@ export async function retryWithRecoveredNpmCommand<T>(options: {
       ...(configuredCommand ? { configuredCommand } : {}),
     },
   };
+}
+
+function isRecoverableNpmCommandError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("npm root -g") || message.includes(" root -g");
 }
