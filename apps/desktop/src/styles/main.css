@@ -2587,13 +2587,13 @@
   gap: 0;
   overflow: hidden;
   border-radius: 20px;
-  border: 1px solid #dfe4ee;
-  background: linear-gradient(180deg, #fcfdff 0%, #f7f8fc 100%);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-muted) 100%);
   box-shadow: 0 8px 20px rgba(35, 44, 67, 0.04);
 }
 
 .extension-package-group--open {
-  border-color: #d4dcec;
+  border-color: var(--line-strong);
   box-shadow: 0 10px 24px rgba(35, 44, 67, 0.05);
 }
 
@@ -2610,8 +2610,8 @@
 }
 
 .extension-package-group__header--open {
-  border-bottom: 1px solid #e7ebf4;
-  background: linear-gradient(180deg, rgba(107, 125, 216, 0.04) 0%, rgba(255, 255, 255, 0.06) 100%);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(107, 125, 216, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
 }
 
 .extension-package-group__copy {
@@ -2654,8 +2654,9 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(241, 243, 248, 0.8);
-  color: var(--muted-soft);
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted-strong);
   font-size: 11px;
   font-weight: 560;
 }
@@ -2683,7 +2684,7 @@
   display: grid;
   gap: 6px;
   padding-top: 6px;
-  border-top: 1px solid rgba(223, 228, 238, 0.8);
+  border-top: 1px solid var(--line);
 }
 
 .extension-row-shell:first-child {
@@ -2700,15 +2701,15 @@
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
   text-align: left;
   transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
 
 .extension-row:hover,
 .extension-row--open {
-  border-color: #c4d0ec;
-  background: #ffffff;
+  border-color: var(--line-strong);
+  background: var(--surface);
   box-shadow: 0 10px 24px rgba(35, 44, 67, 0.08);
 }
 
@@ -2752,30 +2753,34 @@
   min-height: 22px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #f4f6fb;
-  color: var(--muted-soft);
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted-strong);
   font-size: 11px;
   font-weight: 560;
   line-height: 1;
 }
 
 .extension-row__meta-pill--warning {
-  background: #fff0e5;
-  color: #8a4a12;
+  border-color: rgba(204, 120, 50, 0.24);
+  background: rgba(204, 120, 50, 0.12);
+  color: #c77832;
 }
 
 .extension-row__badge {
   padding: 4px 8px;
   border-radius: 999px;
-  background: #f1f3f8;
-  color: var(--muted-soft);
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted-strong);
   font-size: 11px;
   font-weight: 600;
 }
 
 .extension-row__badge--enabled {
-  background: #e8f3ea;
-  color: #2e6a3a;
+  border-color: rgba(46, 106, 58, 0.18);
+  background: rgba(46, 106, 58, 0.12);
+  color: #2e9d4b;
 }
 
 .extension-row__detail {
@@ -2783,7 +2788,7 @@
   padding: 12px 14px 6px;
   border-left: 2px solid rgba(107, 125, 216, 0.18);
   border-radius: 0 0 16px 16px;
-  background: linear-gradient(180deg, rgba(247, 249, 254, 0.92) 0%, rgba(255, 255, 255, 0.98) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 88%, transparent) 0%, var(--surface) 100%);
 }
 
 .extension-inline-surface {
@@ -2800,7 +2805,7 @@
 .extension-inline-surface__tabs {
   align-items: center;
   padding-bottom: 2px;
-  border-bottom: 1px solid #edf0f6;
+  border-bottom: 1px solid var(--line);
 }
 
 .extension-inline-surface__summary-pills {
@@ -2837,6 +2842,35 @@
 .extension-inline-command:first-child {
   border-top: none;
   padding-top: 0;
+}
+
+:root.dark .extension-package-group {
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
+}
+
+:root.dark .extension-package-group--open {
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+}
+
+:root.dark .extension-package-group__header--open {
+  background: linear-gradient(180deg, rgba(124, 107, 245, 0.12) 0%, rgba(255, 255, 255, 0.01) 100%);
+}
+
+:root.dark .extension-row:hover,
+:root.dark .extension-row--open {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+}
+
+:root.dark .extension-row__badge--enabled {
+  border-color: rgba(88, 166, 109, 0.26);
+  background: rgba(88, 166, 109, 0.16);
+  color: #8fe3a3;
+}
+
+:root.dark .extension-row__meta-pill--warning {
+  border-color: rgba(255, 166, 87, 0.28);
+  background: rgba(255, 166, 87, 0.14);
+  color: #ffbd84;
 }
 
 .extension-inline-surface .skill-detail__actions {
