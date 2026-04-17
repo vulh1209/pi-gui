@@ -139,10 +139,10 @@ export function ExtensionsView({
             packageGroups.map((group) => {
               const groupExpanded = group.id === activeGroup?.id;
               return (
-                <section className="skill-detail__meta-list" key={group.id}>
+                <section className={`extension-package-group ${groupExpanded ? "extension-package-group--open" : ""}`} key={group.id}>
                   <button
                     aria-expanded={groupExpanded}
-                    className={`skill-card ${groupExpanded ? "skill-card--active" : ""}`}
+                    className={`extension-package-group__header ${groupExpanded ? "extension-package-group__header--open" : ""}`}
                     type="button"
                     onClick={() => {
                       if (groupExpanded) {
@@ -154,19 +154,24 @@ export function ExtensionsView({
                       setExpandedExtensionPath(group.extensions[0]?.path);
                     }}
                   >
-                    <span className="skill-card__title-row">
-                      <span className="skill-card__title">{group.title}</span>
-                      <span className="skill-card__badge">{group.extensions.length} extensions</span>
+                    <span className="extension-package-group__copy">
+                      <span className="extension-package-group__title-row">
+                        <span className="extension-package-group__title">{group.title}</span>
+                        <span className="extension-package-group__count">{group.extensions.length} extensions</span>
+                      </span>
+                      <span className="extension-package-group__subtitle">{group.subtitle}</span>
+                      <span className="extension-package-group__meta">
+                        <span>{group.sourceLabel}</span>
+                        <span>{group.scopeLabel}</span>
+                      </span>
                     </span>
-                    <span className="skill-card__description">{group.subtitle}</span>
-                    <span className="skill-card__meta">
-                      <span>{group.sourceLabel}</span>
-                      <span>{group.scopeLabel}</span>
+                    <span className="extension-package-group__chevron" aria-hidden="true">
+                      {groupExpanded ? "−" : "+"}
                     </span>
                   </button>
 
                   {groupExpanded ? (
-                    <div className="skill-detail__meta-list" data-testid="extensions-list">
+                    <div className="extension-package-group__body" data-testid="extensions-list">
                       {group.extensions.map((extension) => {
                         const rowExpanded = expandedExtensionPath === extension.path;
                         const extensionCompatibilityRecords = commandCompatibility
@@ -177,30 +182,35 @@ export function ExtensionsView({
                         );
 
                         return (
-                          <div key={extension.path}>
+                          <div className="extension-row-shell" key={extension.path}>
                             <button
                               aria-expanded={rowExpanded}
-                              className={`skill-card ${rowExpanded ? "skill-card--active" : ""}`}
+                              className={`extension-row ${rowExpanded ? "extension-row--open" : ""}`}
                               type="button"
                               onClick={() => setExpandedExtensionPath((current) => (current === extension.path ? undefined : extension.path))}
                             >
-                              <span className="skill-card__title-row">
-                                <span className="skill-card__title">{extension.displayName}</span>
-                                <span className={`skill-card__badge ${extension.enabled ? "skill-card__badge--enabled" : ""}`}>
+                              <span className="extension-row__main">
+                                <span className="extension-row__title-row">
+                                  <span className="extension-row__title">{extension.displayName}</span>
+                                  <span className={`extension-row__badge ${extension.enabled ? "extension-row__badge--enabled" : ""}`}>
                                   {extension.enabled ? "Enabled" : "Disabled"}
+                                  </span>
                                 </span>
+                                <span className="extension-row__summary">{describeExtensionRow(extension)}</span>
                               </span>
-                              <span className="skill-card__description">{describeExtensionRow(extension)}</span>
-                              <span className="skill-card__meta">
+                              <span className="extension-row__meta">
                                 <span>{extension.surfaces.length > 0 ? `${extension.surfaces.length} surfaces` : "No native surface"}</span>
                                 {extension.commands.length > 0 ? <span>{extension.commands.length} commands</span> : null}
                                 {extension.tools.length > 0 ? <span>{extension.tools.length} tools</span> : null}
                                 {extension.diagnostics.length > 0 ? <span>{extension.diagnostics.length} issues</span> : null}
                               </span>
+                              <span className="extension-row__chevron" aria-hidden="true">
+                                {rowExpanded ? "−" : "+"}
+                              </span>
                             </button>
 
                             {rowExpanded ? (
-                              <div className="skill-detail__meta-list">
+                              <div className="extension-row__detail">
                                 <ExtensionsSurface
                                   compatibilityRecords={extensionCompatibilityRecords}
                                   extension={extension}

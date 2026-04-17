@@ -52,7 +52,7 @@ export function ExtensionsSurface({
   const selectedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0] ?? "overview";
 
   return (
-    <div className="skill-detail extension-inline-surface">
+    <div className="extension-inline-surface">
 
       <div className="extension-detail__tokens" role="tablist" aria-label={`${extension.displayName} details tabs`}>
         {availableTabs.map((tab) => (
@@ -103,7 +103,7 @@ function OverviewTab({
   readonly onToggleExtension: (filePath: string, enabled: boolean) => void;
 }) {
   return (
-    <div className="skill-detail__meta-list">
+    <div className="extension-inline-stack">
       <div>
         <div className="skill-detail__meta-label">{extension.displayName}</div>
         <div className="skill-detail__description">{extension.sourceInfo.source}</div>
@@ -177,7 +177,7 @@ function ConfigureTab({
   }
 
   return (
-    <div className="skill-detail__meta-list">
+    <div className="extension-inline-stack">
       {extension.surfaces.map((surface) => (
         <div key={surface.id}>
           <div className="extension-detail__tokens">
@@ -203,9 +203,9 @@ function ExtensionSurfacePanel({
   return (
     <div>
       {surface.description ? <div className="skill-detail__description">{surface.description}</div> : null}
-      <div className="skill-detail__meta-list">
+      <div className="extension-inline-stack">
         {surface.fields.map((field) => (
-          <div key={field.key}>
+          <div className="extension-inline-field" key={field.key}>
             <div className="skill-detail__meta-label">{field.label}</div>
             {field.description ? <div className="skill-detail__description">{field.description}</div> : null}
             {field.kind === "enum" ? (
@@ -269,7 +269,7 @@ function CommandsTab({
   }
 
   return (
-    <div className="skill-detail__meta-list">
+    <div className="extension-inline-stack">
       {commands.map((command) => {
         const override = visibilityOverrides.find(
           (entry) => entry.extensionPath === extension.path && entry.commandName === command.name,
@@ -278,7 +278,7 @@ function CommandsTab({
         const effectiveVisibility = override?.visibility ?? authorDefault;
         const compatibility = compatibilityRecords.find((record) => record.commandName === command.name);
         return (
-          <div key={command.name}>
+          <div className="extension-inline-command" key={command.name}>
             <div className="skill-detail__meta-label">/{command.name}</div>
             <div className="skill-detail__description">{command.description ?? "No description provided."}</div>
             <div className="extension-detail__tokens">
@@ -327,7 +327,7 @@ function DiagnosticsTab({
   readonly compatibilityRecords: readonly ExtensionCommandCompatibilityRecord[];
 }) {
   return (
-    <div className="skill-detail__meta-list">
+    <div className="extension-inline-stack">
       <ExtensionCompatibilitySection commands={extension.commands} compatibilityRecords={compatibilityRecords} />
       <ExtensionDiagnostics diagnostics={extension.diagnostics} />
     </div>
