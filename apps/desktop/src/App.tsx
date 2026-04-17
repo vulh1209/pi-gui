@@ -830,15 +830,19 @@ export default function App() {
   }, [pendingNewThreadWorkspaceId, rootWorkspaceOptions, snapshot]);
 
   useEffect(() => {
-    if (!api || !showBrowserPanel || !selectedWorkspace || !snapshot) {
+    if (!api || !showBrowserPanel || !selectedWorkspace || !snapshot || !browserViewportRef.current) {
       return;
     }
 
-    if (!snapshot.browserPanel.url) {
-      return;
-    }
-
-    void api.syncBrowserPanelWorkspace(selectedWorkspace.id);
+    const rect = browserViewportRef.current.getBoundingClientRect();
+    void api
+      .setBrowserPanelBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      })
+      .then(() => api.syncBrowserPanelWorkspace(selectedWorkspace.id));
   }, [api, selectedWorkspace?.id, showBrowserPanel, snapshot]);
 
   useEffect(() => {

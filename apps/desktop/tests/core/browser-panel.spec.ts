@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
 import {
   createNamedThread,
@@ -5,6 +6,7 @@ import {
   launchDesktop,
   makeGitWorkspace,
   makeUserDataDir,
+  selectSession,
 } from "../helpers/electron-app";
 
 test("opens and closes the browser companion from the topbar and persists the default-safe browser policy", async () => {
@@ -88,5 +90,77 @@ test("navigates a live browser companion and reflects title plus history state",
     await expect(window.getByRole("button", { name: "Forward" })).toBeEnabled();
   } finally {
     await harness.close();
+  }
+});
+
+test("keeps browser auth state per workspace across relaunch", async () => {
+  test.setTimeout(45_000);
+  const userDataDir = await makeUserDataDir();
+  const workspaceA = await makeGitWorkspace("browser-workspace-a");
+  const workspaceB = await makeGitWorkspace("browser-workspace-b");
+
+  const server = createServer((req, res) => {
+    const cookies = req.headers.cookie ?? "";
+    if (req.url === "/login") {
+      res.writeHead(200, {
+        "Content-Type": "text/html",
+        "Set-Cookie": "companion_auth=1; Path=/; HttpOnly; Max-Age=3600",
+      });
+      res.end("<title>Logged In</title><body>logged in</body>");
+      return;
+    }
+
+    const title = cookies.includes("companion_auth=1") ? "Authed" : "Guest";
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end(`<title>${title}</title><body>${title}</body>`);
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Failed to start browser auth server");
+  }
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  const launch = () =>
+    launchDesktop(userDataDir, {
+      initialWorkspaces: [workspaceA, workspaceB],
+      testMode: "background",
+    });
+
+  let harness = await launch();
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Workspace A thread", { workspaceName: "browser-workspace-a" });
+    await createNamedThread(window, "Workspace B thread", { workspaceName: "browser-workspace-b" });
+    await selectSession(window, "Workspace A thread");
+
+    await window.getByRole("button", { name: "Toggle browser companion" }).click();
+    const browserAddress = window.getByLabel("Browser address");
+    await browserAddress.fill(`${baseUrl}/login`);
+    await browserAddress.press("Enter");
+    await expect(window.locator(".browser-panel__title")).toContainText("Logged In");
+  } finally {
+    await harness.close();
+  }
+
+  harness = await launch();
+  try {
+    const window = await harness.firstWindow();
+    await selectSession(window, "Workspace A thread");
+    await window.getByRole("button", { name: "Toggle browser companion" }).click();
+
+    const browserAddress = window.getByLabel("Browser address");
+    await browserAddress.fill(`${baseUrl}/status`);
+    await browserAddress.press("Enter");
+    await expect(window.locator(".browser-panel__title")).toContainText("Authed");
+
+    await selectSession(window, "Workspace B thread");
+    await browserAddress.fill(`${baseUrl}/status`);
+    await browserAddress.press("Enter");
+    await expect(window.locator(".browser-panel__title")).toContainText("Guest");
+  } finally {
+    await harness.close();
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });

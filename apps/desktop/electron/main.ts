@@ -54,6 +54,11 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set<string>(SUPPORTED_IMAGE_TYPES.map((ty
 const OPEN_FOLDER_MENU_ITEM_ID = "file.open-folder";
 const MAX_CLIPBOARD_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CLIPBOARD_IMAGE_DIMENSION = 8_192;
+const configuredUserDataDir = process.env.PI_APP_USER_DATA_DIR?.trim();
+
+if (configuredUserDataDir) {
+  app.setPath("userData", configuredUserDataDir);
+}
 
 function readClipboardImageAttachment(): ComposerImageAttachment | null {
   const image = clipboard.readImage();
@@ -593,6 +598,7 @@ app.on("before-quit", (event) => {
   quittingAfterStoreFlush = true;
   void store
     .flushPersistence()
+    .then(() => browserProfiles.flushStorageData())
     .catch(() => undefined)
     .finally(() => {
       app.quit();
