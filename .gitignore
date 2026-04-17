@@ -9,6 +9,7 @@ storybook-static/
 playwright-report/
 test-results/
 .superpowers/
+.memory/
 .claude/worktrees/
 .codex/worktrees/
 .DS_Store
