@@ -45,15 +45,14 @@ export function ExtensionsSurface({
     if (extension.surfaces.length > 0) {
       tabs.push("configure");
     }
-    tabs.push("commands");
-    tabs.push("diagnostics");
+    tabs.push("commands", "diagnostics");
     return tabs;
   }, [extension.surfaces.length]);
   const [activeTab, setActiveTab] = useState<ExtensionDetailsTab>(availableTabs[0] ?? "overview");
   const selectedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0] ?? "overview";
 
   return (
-    <div className="skill-detail">
+    <div className="extension-inline-surface">
       <div className="skill-detail__header">
         <div>
           <h2>{extension.displayName}</h2>
@@ -62,13 +61,6 @@ export function ExtensionsSurface({
         <span className={`skill-detail__status ${extension.enabled ? "skill-detail__status--enabled" : ""}`}>
           {extension.enabled ? "Enabled" : "Disabled"}
         </span>
-      </div>
-
-      <div className="skill-detail__meta-list">
-        <DetailItem label="Scope" value={extension.sourceInfo.scope} />
-        <DetailItem label="Origin" value={extension.sourceInfo.origin} />
-        <DetailItem label="Path" value={extension.path} mono />
-        {extension.sourceInfo.baseDir ? <DetailItem label="Base dir" value={extension.sourceInfo.baseDir} mono /> : null}
       </div>
 
       <div className="skill-detail__actions">
@@ -84,7 +76,7 @@ export function ExtensionsSurface({
         </button>
       </div>
 
-      <div className="extension-detail__tokens" role="tablist" aria-label="Extension details tabs">
+      <div className="extension-detail__tokens" role="tablist" aria-label={`${extension.displayName} details tabs`}>
         {availableTabs.map((tab) => (
           <button
             aria-selected={selectedTab === tab}
@@ -119,29 +111,32 @@ export function ExtensionsSurface({
 
 function OverviewTab({ extension }: { readonly extension: RuntimeExtensionRecord }) {
   return (
-    <>
-      <div className="skill-detail__meta-list">
-        <div>
-          <div className="skill-detail__meta-label">Surfaces</div>
-          {extension.surfaces.length > 0 ? (
-            <div className="extension-detail__tokens">
-              {extension.surfaces.map((surface) => (
-                <span className="slash-menu__skill-badge" key={surface.id}>
-                  {surface.title} · {surface.kind}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="skill-detail__description">No native extension surfaces published.</div>
-          )}
+    <div className="skill-detail__meta-list">
+      <div>
+        <div className="skill-detail__meta-label">Summary</div>
+        <div className="skill-detail__description">
+          {extension.sourceInfo.scope} · {extension.sourceInfo.origin} · {extension.path}
         </div>
       </div>
-
-      <ExtensionContributionSection title="Commands" items={extension.commands} emptyLabel="No commands contributed." />
-      <ExtensionContributionSection title="Tools" items={extension.tools} emptyLabel="No tools contributed." />
-      <ExtensionContributionSection title="Flags" items={extension.flags} emptyLabel="No flags contributed." />
-      <ExtensionContributionSection title="Shortcuts" items={extension.shortcuts} emptyLabel="No shortcuts contributed." />
-    </>
+      <div>
+        <div className="skill-detail__meta-label">Surfaces</div>
+        {extension.surfaces.length > 0 ? (
+          <div className="extension-detail__tokens">
+            {extension.surfaces.map((surface) => (
+              <span className="slash-menu__skill-badge" key={surface.id}>
+                {surface.title} · {surface.kind}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="skill-detail__description">No native extension surfaces published.</div>
+        )}
+      </div>
+      <InlineContributionSection title="Commands" items={extension.commands} emptyLabel="No commands contributed." />
+      <InlineContributionSection title="Tools" items={extension.tools} emptyLabel="No tools contributed." />
+      <InlineContributionSection title="Flags" items={extension.flags} emptyLabel="No flags contributed." />
+      <InlineContributionSection title="Shortcuts" items={extension.shortcuts} emptyLabel="No shortcuts contributed." />
+    </div>
   );
 }
 
@@ -164,17 +159,17 @@ function ConfigureTab({
   }
 
   return (
-      <div className="skill-detail__meta-list">
-        {extension.surfaces.map((surface) => (
+    <div className="skill-detail__meta-list">
+      {extension.surfaces.map((surface) => (
         <ExtensionSurfacePanel
           key={surface.id}
           extensionPath={extension.path}
           surface={surface}
           onSetSurfaceField={onSetSurfaceField}
         />
-        ))}
-      </div>
-    );
+      ))}
+    </div>
+  );
 }
 
 function ExtensionSurfacePanel({
@@ -239,9 +234,10 @@ function CommandsTab({
   readonly onSetVisibilityOverride: (commandName: string, visibility: ExtensionCommandVisibility) => void;
   readonly onClearVisibilityOverride: (commandName: string) => void;
 }) {
-  const commands = extension.commandRecords.length > 0
-    ? extension.commandRecords
-    : extension.commands.map<RuntimeExtensionCommandRecord>((commandName) => ({ name: commandName }));
+  const commands =
+    extension.commandRecords.length > 0
+      ? extension.commandRecords
+      : extension.commands.map<RuntimeExtensionCommandRecord>((commandName) => ({ name: commandName }));
 
   if (commands.length === 0) {
     return (
@@ -270,9 +266,13 @@ function CommandsTab({
             <div className="extension-detail__tokens">
               <span className="slash-menu__skill-badge">Author default · {formatVisibilityLabel(authorDefault)}</span>
               <span className="slash-menu__skill-badge">Effective · {formatVisibilityLabel(effectiveVisibility)}</span>
-              {override ? <span className="slash-menu__skill-badge">User override · {formatVisibilityLabel(override.visibility)}</span> : null}
+              {override ? (
+                <span className="slash-menu__skill-badge">User override · {formatVisibilityLabel(override.visibility)}</span>
+              ) : null}
               {compatibility ? (
-                <span className={`slash-menu__skill-badge ${compatibility.status === "terminal-only" ? "slash-menu__skill-badge--warning" : ""}`}>
+                <span
+                  className={`slash-menu__skill-badge ${compatibility.status === "terminal-only" ? "slash-menu__skill-badge--warning" : ""}`}
+                >
                   {compatibility.status === "terminal-only" ? "Terminal-only" : "GUI-compatible"}
                 </span>
               ) : null}
@@ -307,10 +307,10 @@ function DiagnosticsTab({
   readonly compatibilityRecords: readonly ExtensionCommandCompatibilityRecord[];
 }) {
   return (
-    <>
+    <div className="skill-detail__meta-list">
       <ExtensionCompatibilitySection commands={extension.commands} compatibilityRecords={compatibilityRecords} />
       <ExtensionDiagnostics diagnostics={extension.diagnostics} />
-    </>
+    </div>
   );
 }
 
@@ -318,27 +318,11 @@ function formatVisibilityLabel(value: ExtensionCommandVisibility): string {
   if (value === "extensions-page") {
     return "Extensions page";
   }
+
   return value === "chat" ? "Chat" : "Hidden";
 }
 
-function DetailItem({
-  label,
-  value,
-  mono,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly mono?: boolean;
-}) {
-  return (
-    <div>
-      <div className="skill-detail__meta-label">{label}</div>
-      <div className={mono ? "skill-detail__path" : "skill-detail__description"}>{value}</div>
-    </div>
-  );
-}
-
-function ExtensionContributionSection({
+function InlineContributionSection({
   title,
   items,
   emptyLabel,
@@ -348,21 +332,19 @@ function ExtensionContributionSection({
   readonly emptyLabel: string;
 }) {
   return (
-    <div className="skill-detail__meta-list">
-      <div>
-        <div className="skill-detail__meta-label">{title}</div>
-        {items.length > 0 ? (
-          <div className="extension-detail__tokens">
-            {items.map((item) => (
-              <span className="slash-menu__skill-badge" key={item}>
-                {item}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="skill-detail__description">{emptyLabel}</div>
-        )}
-      </div>
+    <div>
+      <div className="skill-detail__meta-label">{title}</div>
+      {items.length > 0 ? (
+        <div className="extension-detail__tokens">
+          {items.map((item) => (
+            <span className="slash-menu__skill-badge" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="skill-detail__description">{emptyLabel}</div>
+      )}
     </div>
   );
 }
@@ -373,22 +355,20 @@ function ExtensionDiagnostics({
   readonly diagnostics: RuntimeExtensionRecord["diagnostics"];
 }) {
   return (
-    <div className="skill-detail__meta-list">
-      <div>
-        <div className="skill-detail__meta-label">Diagnostics</div>
-        {diagnostics.length > 0 ? (
-          <div className="extension-detail__diagnostics">
-            {diagnostics.map((diagnostic, index) => (
-              <div className={`activity-item activity-item--${diagnostic.type === "error" ? "error" : "info"}`} key={`${diagnostic.message}:${index}`}>
-                <div className="activity-item__text">{diagnostic.message}</div>
-                {diagnostic.path ? <div className="activity-item__meta">{diagnostic.path}</div> : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="skill-detail__description">No diagnostics reported.</div>
-        )}
-      </div>
+    <div>
+      <div className="skill-detail__meta-label">Diagnostics</div>
+      {diagnostics.length > 0 ? (
+        <div className="extension-detail__diagnostics">
+          {diagnostics.map((diagnostic, index) => (
+            <div className={`activity-item activity-item--${diagnostic.type === "error" ? "error" : "info"}`} key={`${diagnostic.message}:${index}`}>
+              <div className="activity-item__text">{diagnostic.message}</div>
+              {diagnostic.path ? <div className="activity-item__meta">{diagnostic.path}</div> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="skill-detail__description">No diagnostics reported.</div>
+      )}
     </div>
   );
 }
@@ -409,29 +389,27 @@ function ExtensionCompatibilitySection({
   );
 
   return (
-    <div className="skill-detail__meta-list">
-      <div>
-        <div className="skill-detail__meta-label">Command compatibility</div>
-        <div className="skill-detail__description">
-          Learned from real GUI execution. Unlisted commands remain unknown until exercised.
-        </div>
-        <div className="extension-detail__tokens">
-          {supported.map((record) => (
-            <span className="slash-menu__skill-badge" key={`supported:${record.commandName}`}>
-              {record.commandName} · GUI-compatible
-            </span>
-          ))}
-          {terminalOnly.map((record) => (
-            <span className="slash-menu__skill-badge slash-menu__skill-badge--warning" key={`terminal:${record.commandName}`}>
-              {record.commandName} · Terminal-only
-            </span>
-          ))}
-          {unknown.map((commandName) => (
-            <span className="slash-menu__skill-badge" key={`unknown:${commandName}`}>
-              {commandName} · Unknown
-            </span>
-          ))}
-        </div>
+    <div>
+      <div className="skill-detail__meta-label">Command compatibility</div>
+      <div className="skill-detail__description">
+        Learned from real GUI execution. Unlisted commands remain unknown until exercised.
+      </div>
+      <div className="extension-detail__tokens">
+        {supported.map((record) => (
+          <span className="slash-menu__skill-badge" key={`supported:${record.commandName}`}>
+            {record.commandName} · GUI-compatible
+          </span>
+        ))}
+        {terminalOnly.map((record) => (
+          <span className="slash-menu__skill-badge slash-menu__skill-badge--warning" key={`terminal:${record.commandName}`}>
+            {record.commandName} · Terminal-only
+          </span>
+        ))}
+        {unknown.map((commandName) => (
+          <span className="slash-menu__skill-badge" key={`unknown:${commandName}`}>
+            {commandName} · Unknown
+          </span>
+        ))}
       </div>
     </div>
   );

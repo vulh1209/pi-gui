@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { RuntimeExtensionRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type {
   ExtensionCommandCompatibilityRecord,
   ExtensionCommandVisibility,
@@ -7,7 +7,7 @@ import type {
   WorkspaceRecord,
 } from "./desktop-state";
 import { RefreshIcon } from "./icons";
-import { buildExtensionPackageGroups, packageGroupKey } from "./extensions-accordion-model";
+import { buildExtensionPackageGroups } from "./extensions-accordion-model";
 import { ExtensionsSurface } from "./extensions-surface";
 
 interface ExtensionsViewProps {
@@ -37,7 +37,7 @@ export function ExtensionsView({
 }: ExtensionsViewProps) {
   const [query, setQuery] = useState("");
   const [expandedGroupId, setExpandedGroupId] = useState<string | undefined>();
-  const [selectedExtensionPath, setSelectedExtensionPath] = useState<string | undefined>();
+  const [expandedExtensionPath, setExpandedExtensionPath] = useState<string | undefined>();
   const extensions = runtime?.extensions ?? [];
   const filteredExtensions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -62,66 +62,34 @@ export function ExtensionsView({
     );
   }, [extensions, query]);
   const packageGroups = useMemo(() => buildExtensionPackageGroups(filteredExtensions), [filteredExtensions]);
-  const selectedExtension =
-    filteredExtensions.find((extension) => extension.path === selectedExtensionPath) ?? filteredExtensions[0];
-  const selectedGroupId = selectedExtension ? packageGroupKey(selectedExtension) : packageGroups[0]?.id;
-  const activeGroup = packageGroups.find((group) => group.id === (expandedGroupId ?? selectedGroupId)) ?? packageGroups[0];
+  const activeGroup = packageGroups.find((group) => group.id === expandedGroupId) ?? packageGroups[0];
 
   useEffect(() => {
     if (packageGroups.length === 0) {
       if (expandedGroupId !== undefined) {
         setExpandedGroupId(undefined);
       }
-      return;
-    }
-
-    const nextGroupId = expandedGroupId ?? selectedGroupId ?? packageGroups[0]?.id;
-    if (nextGroupId && packageGroups.some((group) => group.id === nextGroupId)) {
-      if (expandedGroupId !== nextGroupId) {
-        setExpandedGroupId(nextGroupId);
+      if (expandedExtensionPath !== undefined) {
+        setExpandedExtensionPath(undefined);
       }
       return;
     }
 
-    if (packageGroups[0]?.id && expandedGroupId !== packageGroups[0].id) {
-      setExpandedGroupId(packageGroups[0].id);
+    if (!expandedGroupId || !packageGroups.some((group) => group.id === expandedGroupId)) {
+      setExpandedGroupId(packageGroups[0]?.id);
     }
-  }, [expandedGroupId, packageGroups, selectedGroupId]);
+  }, [expandedExtensionPath, expandedGroupId, packageGroups]);
 
   useEffect(() => {
     if (!activeGroup) {
       return;
     }
 
-    const selectedInActiveGroup = selectedExtension
-      ? activeGroup.extensions.some((extension) => extension.path === selectedExtension.path)
-      : false;
-    if (selectedInActiveGroup) {
-      return;
+    const activePaths = new Set(activeGroup.extensions.map((extension) => extension.path));
+    if (!expandedExtensionPath || !activePaths.has(expandedExtensionPath)) {
+      setExpandedExtensionPath(activeGroup.extensions[0]?.path);
     }
-
-    const nextSelectedExtension = activeGroup.extensions[0];
-    if (nextSelectedExtension && nextSelectedExtension.path !== selectedExtensionPath) {
-      setSelectedExtensionPath(nextSelectedExtension.path);
-    }
-  }, [activeGroup, selectedExtension, selectedExtensionPath]);
-
-  const selectedCompatibilityRecords = useMemo(
-    () =>
-      selectedExtension
-        ? commandCompatibility
-            .filter((record) => record.extensionPath === selectedExtension.path)
-            .sort((left, right) => left.commandName.localeCompare(right.commandName))
-        : [],
-    [commandCompatibility, selectedExtension],
-  );
-  const selectedOverrides = useMemo(
-    () =>
-      selectedExtension
-        ? visibilityOverrides.filter((entry) => entry.extensionPath === selectedExtension.path)
-        : [],
-    [selectedExtension, visibilityOverrides],
-  );
+  }, [activeGroup, expandedExtensionPath]);
 
   if (!workspace) {
     return (
@@ -164,98 +132,114 @@ export function ExtensionsView({
           />
         </div>
 
-        <div className="skills-layout">
-          <div className="skills-grid" data-testid="extensions-list">
-            {packageGroups.length === 0 ? (
-              <ExtensionsEmptyState message="Refresh runtime discovery to load workspace and user-level extensions." />
-            ) : (
-              packageGroups.map((group) => {
-                const isExpanded = group.id === activeGroup?.id;
-                return (
-                  <section className="skill-detail__meta-list" key={group.id}>
-                    <button
-                      className={`skill-card ${isExpanded ? "skill-card--active" : ""}`}
-                      type="button"
-                      onClick={() => {
-                        setExpandedGroupId((current) => (current === group.id ? undefined : group.id));
-                        const selectedInGroup = selectedExtension
-                          ? group.extensions.some((extension) => extension.path === selectedExtension.path)
-                          : false;
-                        const nextSelectedExtension = selectedInGroup ? selectedExtension : group.extensions[0];
-                        if (nextSelectedExtension && nextSelectedExtension.path !== selectedExtensionPath) {
-                          setSelectedExtensionPath(nextSelectedExtension.path);
-                        }
-                      }}
-                    >
-                      <span className="skill-card__title-row">
-                        <span className="skill-card__title">{group.title}</span>
-                        <span className="skill-card__badge">{group.extensions.length} extensions</span>
-                      </span>
-                      <span className="skill-card__description">{group.subtitle}</span>
-                      <span className="skill-card__meta">
-                        <span>{group.sourceLabel}</span>
-                        <span>{group.scopeLabel}</span>
-                      </span>
-                    </button>
-
-                    {isExpanded
-                      ? group.extensions.map((extension) => (
-                          <button
-                            className={`skill-card ${selectedExtension?.path === extension.path ? "skill-card--active" : ""}`}
-                            key={extension.path}
-                            type="button"
-                            onClick={() => {
-                              setExpandedGroupId(group.id);
-                              setSelectedExtensionPath(extension.path);
-                            }}
-                          >
-                            <span className="skill-card__title-row">
-                              <span className="skill-card__title">{extension.displayName}</span>
-                              <span className={`skill-card__badge ${extension.enabled ? "skill-card__badge--enabled" : ""}`}>
-                                {extension.enabled ? "Enabled" : "Disabled"}
-                              </span>
-                            </span>
-                            <span className="skill-card__description">
-                              {extension.sourceInfo.scope} · {extension.sourceInfo.origin}
-                            </span>
-                            <span className="skill-card__meta">
-                              <span>{extension.sourceInfo.source}</span>
-                              {extension.commands.length > 0 ? <span>{extension.commands.length} commands</span> : null}
-                              {extension.surfaces.length > 0 ? <span>{extension.surfaces.length} surfaces</span> : null}
-                              {extension.tools.length > 0 ? <span>{extension.tools.length} tools</span> : null}
-                              {extension.diagnostics.length > 0 ? <span>{extension.diagnostics.length} issues</span> : null}
-                            </span>
-                          </button>
-                        ))
-                      : null}
-                  </section>
-                );
-              })
-            )}
-          </div>
-
-          {selectedExtension ? (
-            <ExtensionsSurface
-              compatibilityRecords={selectedCompatibilityRecords}
-              extension={selectedExtension}
-            visibilityOverrides={selectedOverrides}
-            onOpenExtensionFolder={onOpenExtensionFolder}
-            onToggleExtension={onToggleExtension}
-            onSetSurfaceField={onSetSurfaceField}
-            onSetVisibilityOverride={(commandName, visibility) =>
-              onSetVisibilityOverride(selectedExtension.path, commandName, visibility)
-            }
-              onClearVisibilityOverride={(commandName) => onClearVisibilityOverride(selectedExtension.path, commandName)}
-            />
+        <div className="skill-detail" data-testid="extensions-accordion">
+          {packageGroups.length === 0 ? (
+            <ExtensionsEmptyState message="Refresh runtime discovery to load workspace and user-level extensions." />
           ) : (
-            <div className="skill-detail">
-              <ExtensionsEmptyState message="Refresh runtime discovery to inspect extension metadata and diagnostics." />
-            </div>
+            packageGroups.map((group) => {
+              const groupExpanded = group.id === activeGroup?.id;
+              return (
+                <section className="skill-detail__meta-list" key={group.id}>
+                  <button
+                    aria-expanded={groupExpanded}
+                    className={`skill-card ${groupExpanded ? "skill-card--active" : ""}`}
+                    type="button"
+                    onClick={() => {
+                      if (groupExpanded) {
+                        setExpandedGroupId(undefined);
+                        return;
+                      }
+
+                      setExpandedGroupId(group.id);
+                      setExpandedExtensionPath(group.extensions[0]?.path);
+                    }}
+                  >
+                    <span className="skill-card__title-row">
+                      <span className="skill-card__title">{group.title}</span>
+                      <span className="skill-card__badge">{group.extensions.length} extensions</span>
+                    </span>
+                    <span className="skill-card__description">{group.subtitle}</span>
+                    <span className="skill-card__meta">
+                      <span>{group.sourceLabel}</span>
+                      <span>{group.scopeLabel}</span>
+                    </span>
+                  </button>
+
+                  {groupExpanded ? (
+                    <div className="skill-detail__meta-list">
+                      {group.extensions.map((extension) => {
+                        const rowExpanded = expandedExtensionPath === extension.path;
+                        const extensionCompatibilityRecords = commandCompatibility
+                          .filter((record) => record.extensionPath === extension.path)
+                          .sort((left, right) => left.commandName.localeCompare(right.commandName));
+                        const extensionOverrides = visibilityOverrides.filter(
+                          (entry) => entry.extensionPath === extension.path,
+                        );
+
+                        return (
+                          <div key={extension.path}>
+                            <button
+                              aria-expanded={rowExpanded}
+                              className={`skill-card ${rowExpanded ? "skill-card--active" : ""}`}
+                              type="button"
+                              onClick={() => setExpandedExtensionPath((current) => (current === extension.path ? undefined : extension.path))}
+                            >
+                              <span className="skill-card__title-row">
+                                <span className="skill-card__title">{extension.displayName}</span>
+                                <span className={`skill-card__badge ${extension.enabled ? "skill-card__badge--enabled" : ""}`}>
+                                  {extension.enabled ? "Enabled" : "Disabled"}
+                                </span>
+                              </span>
+                              <span className="skill-card__description">{describeExtensionRow(extension)}</span>
+                              <span className="skill-card__meta">
+                                <span>{extension.surfaces.length > 0 ? `${extension.surfaces.length} surfaces` : "No native surface"}</span>
+                                {extension.commands.length > 0 ? <span>{extension.commands.length} commands</span> : null}
+                                {extension.tools.length > 0 ? <span>{extension.tools.length} tools</span> : null}
+                                {extension.diagnostics.length > 0 ? <span>{extension.diagnostics.length} issues</span> : null}
+                              </span>
+                            </button>
+
+                            {rowExpanded ? (
+                              <div className="skill-detail__meta-list">
+                                <ExtensionsSurface
+                                  compatibilityRecords={extensionCompatibilityRecords}
+                                  extension={extension}
+                                  visibilityOverrides={extensionOverrides}
+                                  onOpenExtensionFolder={onOpenExtensionFolder}
+                                  onToggleExtension={onToggleExtension}
+                                  onSetSurfaceField={onSetSurfaceField}
+                                  onSetVisibilityOverride={(commandName, visibility) =>
+                                    onSetVisibilityOverride(extension.path, commandName, visibility)
+                                  }
+                                  onClearVisibilityOverride={(commandName) =>
+                                    onClearVisibilityOverride(extension.path, commandName)
+                                  }
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })
           )}
         </div>
       </div>
     </section>
   );
+}
+
+function describeExtensionRow(extension: RuntimeExtensionRecord): string {
+  const parts = [
+    extension.sourceInfo.scope === "project" ? "Project-local" : "User-level",
+    extension.surfaces.length > 0 ? "Native surface" : undefined,
+    extension.commandRecords.some((command) => command.visibility === "extensions-page") ? "Extensions-page commands" : undefined,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" · ") : extension.sourceInfo.origin;
 }
 
 function ExtensionsEmptyState({ message }: { readonly message: string }) {
