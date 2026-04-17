@@ -14,6 +14,46 @@ const PI_EXTENSIONS_SOURCE = "npm:@tungthedev/pi-extensions";
 
 test.skip(process.platform !== "darwin", "Desktop extension-surface coverage currently targets macOS.");
 
+test("keeps the Extensions accordion compact when native surfaces expand", async () => {
+  test.setTimeout(120_000);
+
+  const userDataDir = await makeUserDataDir("pi-gui-extensions-density-");
+  const agentDir = `${userDataDir}/agent`;
+  const workspacePath = await makeWorkspace("extensions-density-workspace");
+  await seedAgentDir(agentDir, {
+    packages: [PI_EXTENSIONS_SOURCE],
+  });
+
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    agentDir,
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await waitForWorkspaceByPath(window, workspacePath);
+
+    await window.getByRole("button", { name: "Extensions", exact: true }).click();
+    await expect(window.getByTestId("extensions-surface")).toBeVisible();
+
+    const piModesRow = window.getByRole("button", { name: /pi-modes/i }).first();
+    await piModesRow.click();
+    await expect(piModesRow).toHaveAttribute("aria-expanded", "true");
+    await window.getByRole("tab", { name: "Configure", exact: true }).click();
+    await expect(window.locator(".extension-inline-surface")).toContainText("Pi Mode");
+
+    const metrics = await readExtensionsDensityMetrics(window);
+    expect(metrics.groupHeaderPaddingY).toBeLessThanOrEqual(12);
+    expect(metrics.rowPaddingY).toBeLessThanOrEqual(8);
+    expect(metrics.detailPaddingTop).toBeLessThanOrEqual(8);
+    expect(metrics.detailPaddingX).toBeLessThanOrEqual(10);
+    expect(metrics.tabMinHeight).toBeLessThanOrEqual(28);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("renders Tungdev pi-mode as a native settings surface in Extensions and updates its mode", async () => {
   test.setTimeout(120_000);
 
@@ -128,6 +168,37 @@ test("keeps pi-mode out of chat by default and shows it again after a global cha
     await harness.close();
   }
 });
+
+async function readExtensionsDensityMetrics(window: Parameters<typeof getDesktopState>[0]): Promise<{
+  groupHeaderPaddingY: number;
+  rowPaddingY: number;
+  detailPaddingTop: number;
+  detailPaddingX: number;
+  tabMinHeight: number;
+}> {
+  return window.evaluate(() => {
+    const packageGroup = document.querySelector<HTMLElement>(".extension-package-group__header");
+    const row = document.querySelector<HTMLElement>(".extension-row");
+    const detail = document.querySelector<HTMLElement>(".extension-row__detail");
+    const tab = document.querySelector<HTMLElement>(".extension-inline-surface .button[role='tab']");
+    if (!packageGroup || !row || !detail || !tab) {
+      throw new Error("Extensions density metrics are unavailable.");
+    }
+
+    const packageGroupStyle = getComputedStyle(packageGroup);
+    const rowStyle = getComputedStyle(row);
+    const detailStyle = getComputedStyle(detail);
+    const tabStyle = getComputedStyle(tab);
+
+    return {
+      groupHeaderPaddingY: Number.parseFloat(packageGroupStyle.paddingTop),
+      rowPaddingY: Number.parseFloat(rowStyle.paddingTop),
+      detailPaddingTop: Number.parseFloat(detailStyle.paddingTop),
+      detailPaddingX: Number.parseFloat(detailStyle.paddingLeft),
+      tabMinHeight: Number.parseFloat(tabStyle.minHeight),
+    };
+  });
+}
 
 async function readPiModeToolSet(window: Parameters<typeof getDesktopState>[0], workspaceId: string): Promise<string | null> {
   const state = await getDesktopState(window);
