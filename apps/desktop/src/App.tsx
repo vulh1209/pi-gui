@@ -683,6 +683,7 @@ export default function App() {
     selectedModelRuntime,
     sessionCommands: selectedSessionCommands,
     commandCompatibility: selectedWorkspaceCommandCompatibility,
+    visibilityOverrides: snapshot?.extensionCommandVisibilityOverrides ?? [],
     selectedSessionKey,
     selectedSession,
     selectedWorkspace,
@@ -711,6 +712,7 @@ export default function App() {
     selectedModelRuntime: newThreadRuntime,
     sessionCommands: [],
     commandCompatibility: [],
+    visibilityOverrides: snapshot?.extensionCommandVisibilityOverrides ?? [],
     selectedSessionKey: `new-thread:${newThreadWorkspace?.id ?? ""}`,
     selectedSession: undefined,
     selectedWorkspace: newThreadWorkspace,
@@ -1498,6 +1500,20 @@ export default function App() {
     void updateSnapshot(api, setSnapshot, () => api.clearExtensionCommandVisibilityOverride(extensionPath, commandName));
   };
 
+  const handleSetExtensionSurfaceField = (extensionPath: string, fieldKey: string, value: string | boolean) => {
+    if (!api || !extensionsWorkspace) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () =>
+      api.setExtensionSurfaceField({
+        workspaceId: extensionsWorkspace.id,
+        extensionPath,
+        fieldKey,
+        value,
+      }),
+    );
+  };
+
   const handleTrySkill = (command: string) => {
     void updateSnapshot(api, setSnapshot, () => api.setActiveView("threads"));
     slashMenu.fillComposerFromSlash(command);
@@ -1876,6 +1892,7 @@ export default function App() {
             void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(extensionsWorkspace.id));
           }}
           onToggleExtension={handleToggleExtension}
+          onSetSurfaceField={handleSetExtensionSurfaceField}
           onSetVisibilityOverride={handleSetExtensionVisibilityOverride}
           onClearVisibilityOverride={handleClearExtensionVisibilityOverride}
         />

@@ -133,6 +133,13 @@ export interface ExtensionCommandVisibilityOverrideRecord {
   readonly visibility: ExtensionCommandVisibility;
 }
 
+export interface ExtensionSurfaceFieldUpdateInput {
+  readonly workspaceId: string;
+  readonly extensionPath: string;
+  readonly fieldKey: string;
+  readonly value: string | boolean;
+}
+
 export interface WorkspaceRecord {
   readonly id: string;
   readonly name: string;

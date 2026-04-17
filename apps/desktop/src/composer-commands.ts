@@ -1,11 +1,16 @@
 import type { SessionConfig } from "@pi-gui/session-driver";
 import type {
   RuntimeCommandRecord,
+  RuntimeExtensionCommandRecord,
+  RuntimeExtensionCommandVisibility,
   RuntimeProviderRecord,
   RuntimeSettingsSnapshot,
   RuntimeSnapshot,
 } from "@pi-gui/session-driver/runtime-types";
-import type { ExtensionCommandCompatibilityRecord } from "./desktop-state";
+import type {
+  ExtensionCommandCompatibilityRecord,
+  ExtensionCommandVisibilityOverrideRecord,
+} from "./desktop-state";
 import { titleCase } from "./string-utils";
 
 export type ComposerSlashCommandKind =
@@ -249,6 +254,7 @@ export function buildSlashCommandSections(
   runtime: RuntimeSnapshot | undefined,
   sessionCommands: readonly RuntimeCommandRecord[],
   compatibilityRecords: readonly ExtensionCommandCompatibilityRecord[] = [],
+  visibilityOverrides: readonly ExtensionCommandVisibilityOverrideRecord[] = [],
   options: {
     readonly allowTreeCommand?: boolean;
   } = {},
@@ -259,7 +265,10 @@ export function buildSlashCommandSections(
     return [];
   }
 
-  const availableRuntimeCommands = resolveRuntimeCommands(runtime, sessionCommands);
+  const availableRuntimeCommands = resolveRuntimeCommands(runtime, sessionCommands, {
+    visibilityOverrides,
+    chatOnly: true,
+  });
   const compatibilityByKey = new Map(
     compatibilityRecords.map((record) => [`${record.extensionPath}::${record.commandName}`, record] as const),
   );
@@ -301,20 +310,31 @@ export function buildSlashCommandSections(
 export function resolveRuntimeCommands(
   runtime: RuntimeSnapshot | undefined,
   sessionCommands: readonly RuntimeCommandRecord[],
+  options: {
+    readonly visibilityOverrides?: readonly ExtensionCommandVisibilityOverrideRecord[];
+    readonly chatOnly?: boolean;
+  } = {},
 ): readonly RuntimeCommandRecord[] {
+  const visibilityOverrides = options.visibilityOverrides ?? [];
+  const chatOnly = options.chatOnly ?? false;
   if (!runtime) {
-    return sessionCommands;
+    return chatOnly
+      ? sessionCommands.filter((command) => command.source !== "extension")
+      : sessionCommands;
   }
 
   const baseCommands = runtime.settings.enableSkillCommands
     ? sessionCommands
     : sessionCommands.filter((command) => command.source !== "skill");
+  const visibleBaseCommands = chatOnly
+    ? baseCommands.filter((command) => resolveExtensionCommandVisibility(runtime, command, visibilityOverrides) === "chat")
+    : baseCommands;
   if (!runtime.settings.enableSkillCommands) {
-    return baseCommands;
+    return visibleBaseCommands;
   }
 
-  const merged = [...baseCommands];
-  const seenNames = new Set(baseCommands.map((command) => command.name));
+  const merged = [...visibleBaseCommands];
+  const seenNames = new Set(visibleBaseCommands.map((command) => command.name));
   for (const skill of runtime.skills) {
     if (!skill.enabled) {
       continue;
@@ -364,6 +384,39 @@ export function resolveRuntimeSlashCommand(
   const spaceIndex = trimmed.indexOf(" ");
   const commandName = normalizeRuntimeCommandName(spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex));
   return resolveRuntimeCommands(runtime, sessionCommands).find((command) => command.name === commandName);
+}
+
+export function resolveExtensionCommandVisibility(
+  runtime: RuntimeSnapshot | undefined,
+  command: RuntimeCommandRecord,
+  overrides: readonly ExtensionCommandVisibilityOverrideRecord[] = [],
+): RuntimeExtensionCommandVisibility {
+  if (command.source !== "extension") {
+    return "chat";
+  }
+
+  const override = overrides.find(
+    (entry) => entry.extensionPath === command.sourceInfo.path && entry.commandName === command.name,
+  );
+  if (override) {
+    return override.visibility;
+  }
+
+  const commandRecord = findRuntimeExtensionCommand(runtime, command);
+  return commandRecord?.visibility ?? "chat";
+}
+
+function findRuntimeExtensionCommand(
+  runtime: RuntimeSnapshot | undefined,
+  command: RuntimeCommandRecord,
+): RuntimeExtensionCommandRecord | undefined {
+  if (!runtime || command.source !== "extension") {
+    return undefined;
+  }
+
+  return runtime.extensions
+    .find((extension) => extension.path === command.sourceInfo.path)
+    ?.commandRecords.find((entry) => entry.name === command.name);
 }
 
 function normalizeRuntimeCommandName(value: string): string {

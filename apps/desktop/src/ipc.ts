@@ -14,6 +14,7 @@ import type {
   CreateWorktreeInput,
   DesktopAppState,
   ExtensionCommandVisibilityOverrideRecord,
+  ExtensionSurfaceFieldUpdateInput,
   ModelSettingsScopeMode,
   NotificationPreferences,
   RemoveWorktreeInput,
@@ -79,6 +80,7 @@ export const desktopIpc = {
   setScopedModelPatterns: "pi-gui:set-scoped-model-patterns",
   setSkillEnabled: "pi-gui:set-skill-enabled",
   setExtensionEnabled: "pi-gui:set-extension-enabled",
+  setExtensionSurfaceField: "pi-gui:set-extension-surface-field",
   setExtensionCommandVisibilityOverride: "pi-gui:set-extension-command-visibility-override",
   clearExtensionCommandVisibilityOverride: "pi-gui:clear-extension-command-visibility-override",
   respondToHostUiRequest: "pi-gui:respond-to-host-ui-request",
@@ -213,6 +215,7 @@ export interface PiDesktopApi {
   setScopedModelPatterns(workspaceId: string, patterns: readonly string[]): Promise<DesktopAppState>;
   setSkillEnabled(workspaceId: string, filePath: string, enabled: boolean): Promise<DesktopAppState>;
   setExtensionEnabled(workspaceId: string, filePath: string, enabled: boolean): Promise<DesktopAppState>;
+  setExtensionSurfaceField(input: ExtensionSurfaceFieldUpdateInput): Promise<DesktopAppState>;
   setExtensionCommandVisibilityOverride(
     override: ExtensionCommandVisibilityOverrideRecord,
   ): Promise<DesktopAppState>;

@@ -17,6 +17,7 @@ interface ExtensionsViewProps {
   readonly onRefresh: () => void;
   readonly onOpenExtensionFolder: (filePath: string) => void;
   readonly onToggleExtension: (filePath: string, enabled: boolean) => void;
+  readonly onSetSurfaceField: (extensionPath: string, fieldKey: string, value: string | boolean) => void;
   readonly onSetVisibilityOverride: (extensionPath: string, commandName: string, visibility: ExtensionCommandVisibility) => void;
   readonly onClearVisibilityOverride: (extensionPath: string, commandName: string) => void;
 }
@@ -29,6 +30,7 @@ export function ExtensionsView({
   onRefresh,
   onOpenExtensionFolder,
   onToggleExtension,
+  onSetSurfaceField,
   onSetVisibilityOverride,
   onClearVisibilityOverride,
 }: ExtensionsViewProps) {
@@ -156,12 +158,13 @@ export function ExtensionsView({
             <ExtensionsSurface
               compatibilityRecords={selectedCompatibilityRecords}
               extension={selectedExtension}
-              visibilityOverrides={selectedOverrides}
-              onOpenExtensionFolder={onOpenExtensionFolder}
-              onToggleExtension={onToggleExtension}
-              onSetVisibilityOverride={(commandName, visibility) =>
-                onSetVisibilityOverride(selectedExtension.path, commandName, visibility)
-              }
+            visibilityOverrides={selectedOverrides}
+            onOpenExtensionFolder={onOpenExtensionFolder}
+            onToggleExtension={onToggleExtension}
+            onSetSurfaceField={onSetSurfaceField}
+            onSetVisibilityOverride={(commandName, visibility) =>
+              onSetVisibilityOverride(selectedExtension.path, commandName, visibility)
+            }
               onClearVisibilityOverride={(commandName) => onClearVisibilityOverride(selectedExtension.path, commandName)}
             />
           ) : (

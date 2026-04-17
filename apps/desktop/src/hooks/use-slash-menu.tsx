@@ -1,6 +1,12 @@
 import { useEffect, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from "react";
 import type { RuntimeCommandRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
-import type { DesktopAppState, ExtensionCommandCompatibilityRecord, SessionRecord, WorkspaceRecord } from "../desktop-state";
+import type {
+  DesktopAppState,
+  ExtensionCommandCompatibilityRecord,
+  ExtensionCommandVisibilityOverrideRecord,
+  SessionRecord,
+  WorkspaceRecord,
+} from "../desktop-state";
 import {
   buildModelOptions,
   isExactSlashCommand,
@@ -59,6 +65,7 @@ interface UseSlashMenuParams {
   readonly selectedModelRuntime: RuntimeSnapshot | undefined;
   readonly sessionCommands: readonly RuntimeCommandRecord[];
   readonly commandCompatibility: readonly ExtensionCommandCompatibilityRecord[];
+  readonly visibilityOverrides?: readonly ExtensionCommandVisibilityOverrideRecord[];
   readonly selectedSessionKey: string;
   readonly selectedSession: SessionRecord | undefined;
   readonly selectedWorkspace: WorkspaceRecord | undefined;
@@ -107,6 +114,7 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
     selectedModelRuntime,
     sessionCommands,
     commandCompatibility,
+    visibilityOverrides = [],
     selectedSessionKey,
     selectedSession,
     selectedWorkspace,
@@ -134,7 +142,7 @@ export function useSlashMenu(params: UseSlashMenuParams): SlashMenuState {
   const slashQuery = activeSlashQuery?.query ?? "";
   const slashSections =
     activeSlashQuery
-      ? buildSlashCommandSections(slashQuery, selectedRuntime, sessionCommands, commandCompatibility, {
+      ? buildSlashCommandSections(slashQuery, selectedRuntime, sessionCommands, commandCompatibility, visibilityOverrides, {
           allowTreeCommand,
         })
       : [];

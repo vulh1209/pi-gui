@@ -18,6 +18,7 @@ interface ExtensionsSurfaceProps {
   readonly visibilityOverrides: readonly ExtensionCommandVisibilityOverrideRecord[];
   readonly onOpenExtensionFolder: (filePath: string) => void;
   readonly onToggleExtension: (filePath: string, enabled: boolean) => void;
+  readonly onSetSurfaceField: (extensionPath: string, fieldKey: string, value: string | boolean) => void;
   readonly onSetVisibilityOverride: (commandName: string, visibility: ExtensionCommandVisibility) => void;
   readonly onClearVisibilityOverride: (commandName: string) => void;
 }
@@ -35,6 +36,7 @@ export function ExtensionsSurface({
   visibilityOverrides,
   onOpenExtensionFolder,
   onToggleExtension,
+  onSetSurfaceField,
   onSetVisibilityOverride,
   onClearVisibilityOverride,
 }: ExtensionsSurfaceProps) {
@@ -98,7 +100,7 @@ export function ExtensionsSurface({
       </div>
 
       {selectedTab === "overview" ? <OverviewTab extension={extension} /> : null}
-      {selectedTab === "configure" ? <ConfigureTab extension={extension} /> : null}
+      {selectedTab === "configure" ? <ConfigureTab extension={extension} onSetSurfaceField={onSetSurfaceField} /> : null}
       {selectedTab === "commands" ? (
         <CommandsTab
           compatibilityRecords={compatibilityRecords}
@@ -143,7 +145,13 @@ function OverviewTab({ extension }: { readonly extension: RuntimeExtensionRecord
   );
 }
 
-function ConfigureTab({ extension }: { readonly extension: RuntimeExtensionRecord }) {
+function ConfigureTab({
+  extension,
+  onSetSurfaceField,
+}: {
+  readonly extension: RuntimeExtensionRecord;
+  readonly onSetSurfaceField: (extensionPath: string, fieldKey: string, value: string | boolean) => void;
+}) {
   if (extension.surfaces.length === 0) {
     return (
       <div className="skill-detail__meta-list">
@@ -156,15 +164,28 @@ function ConfigureTab({ extension }: { readonly extension: RuntimeExtensionRecor
   }
 
   return (
-    <div className="skill-detail__meta-list">
-      {extension.surfaces.map((surface) => (
-        <ExtensionSurfacePanel key={surface.id} surface={surface} />
-      ))}
-    </div>
-  );
+      <div className="skill-detail__meta-list">
+        {extension.surfaces.map((surface) => (
+        <ExtensionSurfacePanel
+          key={surface.id}
+          extensionPath={extension.path}
+          surface={surface}
+          onSetSurfaceField={onSetSurfaceField}
+        />
+        ))}
+      </div>
+    );
 }
 
-function ExtensionSurfacePanel({ surface }: { readonly surface: RuntimeExtensionSurfaceRecord }) {
+function ExtensionSurfacePanel({
+  extensionPath,
+  surface,
+  onSetSurfaceField,
+}: {
+  readonly extensionPath: string;
+  readonly surface: RuntimeExtensionSurfaceRecord;
+  readonly onSetSurfaceField: (extensionPath: string, fieldKey: string, value: string | boolean) => void;
+}) {
   return (
     <div>
       <div className="skill-detail__meta-label">{surface.title}</div>
@@ -177,20 +198,25 @@ function ExtensionSurfacePanel({ surface }: { readonly surface: RuntimeExtension
             {field.kind === "enum" ? (
               <div className="extension-detail__tokens">
                 {field.options.map((option) => (
-                  <span
-                    className={`slash-menu__skill-badge ${option.value === field.value ? "skill-detail__status--enabled" : ""}`}
+                  <button
+                    className={`button button--secondary ${option.value === field.value ? "button--primary" : ""}`}
                     key={option.value}
+                    type="button"
+                    onClick={() => onSetSurfaceField(extensionPath, field.key, option.value)}
                   >
                     {option.label}
-                    {option.value === field.value ? " · Current" : ""}
-                  </span>
+                  </button>
                 ))}
               </div>
             ) : (
               <div className="extension-detail__tokens">
-                <span className={`slash-menu__skill-badge ${field.value ? "skill-detail__status--enabled" : ""}`}>
+                <button
+                  className={`button button--secondary ${field.value ? "button--primary" : ""}`}
+                  type="button"
+                  onClick={() => onSetSurfaceField(extensionPath, field.key, !field.value)}
+                >
                   {field.value ? "Enabled" : "Disabled"}
-                </span>
+                </button>
               </div>
             )}
           </div>

@@ -42,6 +42,7 @@ import {
   type ComposerDraftSyncSource,
   type ExtensionCommandCompatibilityRecord,
   type ExtensionCommandVisibilityOverrideRecord,
+  type ExtensionSurfaceFieldUpdateInput,
   type ModelSettingsScopeMode,
   createEmptyDesktopAppState,
   type CreateSessionInput,
@@ -764,6 +765,17 @@ export class DesktopAppStore implements AppStoreInternals {
     };
     await this.persistUiState();
     return this.emit();
+  }
+
+  async setExtensionSurfaceField(input: ExtensionSurfaceFieldUpdateInput): Promise<DesktopAppState> {
+    return this.withRuntimeUpdate(input.workspaceId, (ws) =>
+      this.driver.runtimeSupervisor.setExtensionSurfaceField(ws, {
+        extensionPath: input.extensionPath,
+        fieldKey: input.fieldKey,
+        value: input.value,
+      }),
+      { reloadSessions: true },
+    );
   }
 
   async clearExtensionCommandVisibilityOverride(

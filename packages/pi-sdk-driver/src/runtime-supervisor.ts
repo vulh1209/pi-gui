@@ -32,6 +32,10 @@ import {
   hasNpmPackageSources,
   retryWithRecoveredNpmCommand,
 } from "./npm-command-recovery.js";
+import {
+  applyKnownExtensionSurfaceField,
+  applyKnownExtensionSurfaceMetadata,
+} from "./extension-surface-adapters.js";
 import { skillSlashCommand } from "./runtime-command-utils.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
@@ -354,6 +358,26 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     await context.settingsManager.flush();
     await context.resourceLoader.reload();
     return this.buildSnapshot(context);
+  }
+
+  async setExtensionSurfaceField(
+    workspace: WorkspaceRef,
+    input: {
+      readonly extensionPath: string;
+      readonly fieldKey: string;
+      readonly value: string | boolean;
+    },
+  ): Promise<RuntimeSnapshot> {
+    const applied = await applyKnownExtensionSurfaceField({
+      agentDir: this.agentDir,
+      extensionPath: input.extensionPath,
+      fieldKey: input.fieldKey,
+      value: input.value,
+    });
+    if (!applied) {
+      throw new Error(`No known extension surface adapter for ${input.extensionPath}.`);
+    }
+    return this.refreshRuntime(workspace);
   }
 
   private async ensureContext(workspace: WorkspaceRef): Promise<RuntimeContext> {
@@ -698,7 +722,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
       diagnosticsByPath.set(resolve(error.path), diagnostics);
     }
 
-    const records = resolvedExtensions.map<RuntimeExtensionRecord>((resource) => {
+    const records = await Promise.all(resolvedExtensions.map(async (resource) => {
       const path = resolve(resource.path);
       const loaded = loadedByPath.get(path);
       const commandRecords = loaded
@@ -710,14 +734,20 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
             }))
             .sort((left, right) => left.name.localeCompare(right.name))
         : [];
+      const adaptedMetadata = await applyKnownExtensionSurfaceMetadata({
+        agentDir: this.agentDir,
+        extensionPath: path,
+        commandRecords,
+        surfaces: loaded?.surfaces ? [...loaded.surfaces] : [],
+      });
       return {
         path,
         displayName: inferExtensionName(path),
         enabled: resource.enabled,
         sourceInfo: toRuntimeSourceInfo(path, resource.metadata),
-        commands: commandRecords.map((command) => command.name),
-        commandRecords,
-        surfaces: loaded?.surfaces ? [...loaded.surfaces] : [],
+        commands: adaptedMetadata.commandRecords.map((command) => command.name),
+        commandRecords: adaptedMetadata.commandRecords,
+        surfaces: adaptedMetadata.surfaces,
         tools: loaded
           ? [...loaded.tools.values()]
               .map((tool) => tool.definition.name)
@@ -727,7 +757,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         shortcuts: loaded ? [...loaded.shortcuts.keys()].sort((left, right) => left.localeCompare(right)) : [],
         diagnostics: diagnosticsByPath.get(path) ?? [],
       };
-    });
+    }));
 
     return records.sort((left, right) =>
       left.displayName === right.displayName

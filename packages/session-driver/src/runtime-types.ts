@@ -190,4 +190,12 @@ export interface RuntimeResourceDriver {
   setScopedModelPatterns(workspace: WorkspaceRef, patterns: readonly string[]): Promise<RuntimeSnapshot>;
   setSkillEnabled(workspace: WorkspaceRef, filePath: string, enabled: boolean): Promise<RuntimeSnapshot>;
   setExtensionEnabled(workspace: WorkspaceRef, filePath: string, enabled: boolean): Promise<RuntimeSnapshot>;
+  setExtensionSurfaceField(
+    workspace: WorkspaceRef,
+    input: {
+      readonly extensionPath: string;
+      readonly fieldKey: string;
+      readonly value: string | boolean;
+    },
+  ): Promise<RuntimeSnapshot>;
 }

@@ -11,7 +11,7 @@ import {
   waitForWorkspaceByPath,
 } from "../helpers/electron-app";
 
-const PI_EXTENSIONS_SOURCE = "npm:@tungthedev/pi-extensions@2.0.0-alpha.1";
+const PI_EXTENSIONS_SOURCE = "npm:@tungthedev/pi-extensions";
 
 test.skip(process.platform !== "darwin", "This regression targets macOS GUI launch behavior.");
 

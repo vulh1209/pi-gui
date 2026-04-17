@@ -32,6 +32,7 @@ import type {
   CreateSessionInput,
   CreateWorktreeInput,
   ExtensionCommandVisibilityOverrideRecord,
+  ExtensionSurfaceFieldUpdateInput,
   RemoveWorktreeInput,
   StartThreadInput,
   WorkspaceSessionTarget,
@@ -557,6 +558,10 @@ app.whenReady().then(async () => {
   );
   ipcMain.handle(desktopIpc.setExtensionEnabled, (_event, workspaceId: string, filePath: string, enabled: boolean) =>
     store.setExtensionEnabled(workspaceId, filePath, enabled),
+  );
+  ipcMain.handle(
+    desktopIpc.setExtensionSurfaceField,
+    (_event, input: ExtensionSurfaceFieldUpdateInput) => store.setExtensionSurfaceField(input),
   );
   ipcMain.handle(
     desktopIpc.setExtensionCommandVisibilityOverride,
