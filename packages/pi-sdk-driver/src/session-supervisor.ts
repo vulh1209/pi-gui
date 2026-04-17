@@ -429,7 +429,7 @@ export class SessionSupervisor {
         });
       }
 
-      if (isExtensionCommand) {
+      if (isExtensionCommand || (!isQueuedMessage && !session.isStreaming)) {
         await this.syncRecordAfterSessionMutation(record, { emitUpdate: true });
       }
     } catch (error) {
