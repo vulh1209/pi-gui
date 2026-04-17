@@ -13,6 +13,7 @@ import {
 import {
   BROWSER_SLASH_USAGE,
   isBrowserSlashCommand,
+  parseNaturalLanguageBrowserIntentSequence,
   parseBrowserSlashCommand,
   parseNaturalLanguageBrowserIntent,
 } from "../src/browser-command-routing";
@@ -283,6 +284,17 @@ export async function submitComposer(
   const naturalLanguageBrowserAction = attachments.length === 0
     ? parseNaturalLanguageBrowserIntent(text)
     : undefined;
+  const naturalLanguageBrowserSequence = attachments.length === 0
+    ? parseNaturalLanguageBrowserIntentSequence(text)
+    : undefined;
+  if (naturalLanguageBrowserSequence) {
+    for (const action of naturalLanguageBrowserSequence.actions) {
+      await store.runBrowserHostAction(action);
+    }
+    return finishComposerCommand(store, sessionRef, key, naturalLanguageBrowserSequence.label, {
+      appendActivity: false,
+    });
+  }
   if (naturalLanguageBrowserAction) {
     await store.runBrowserHostAction(naturalLanguageBrowserAction);
     return finishComposerCommand(store, sessionRef, key, `Browser ${naturalLanguageBrowserAction.name}`, {

@@ -22,6 +22,11 @@ export type BrowserHostAction =
   | { readonly name: "scroll"; readonly target: BrowserScrollTarget }
   | { readonly name: "select"; readonly selector: string; readonly value: string };
 
+export interface BrowserHostActionSequence {
+  readonly actions: readonly BrowserHostAction[];
+  readonly label: string;
+}
+
 const BROWSER_COMMAND = "/browser";
 const COMMON_BROWSER_TARGETS: Readonly<Record<string, string>> = {
   google: "https://www.google.com",
@@ -147,6 +152,36 @@ export function parseNaturalLanguageBrowserIntent(text: string): BrowserHostActi
   return undefined;
 }
 
+export function parseNaturalLanguageBrowserIntentSequence(
+  text: string,
+): BrowserHostActionSequence | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const compositeSearchMatch = trimmed.match(
+    /^(?:mở|mo|open)\s+(?:trang\s+|page\s+|site\s+)?(.+?)\s+(?:rồi\s+|roi\s+|and\s+|then\s+)?(?:tìm|tim|search(?:\s+for)?)\s+(.+)$/i,
+  );
+  const rawTarget = compositeSearchMatch?.[1]?.trim();
+  const rawQuery = compositeSearchMatch?.[2]?.trim();
+  const url = normalizeBrowserUrl(rawTarget);
+  const query = trimBrowserCompanionSuffix(rawQuery);
+  if (!url || !query) {
+    return undefined;
+  }
+
+  const searchSelector = searchFieldSelectorForUrl(url);
+  return {
+    label: `Browser search ${url}`,
+    actions: [
+      { name: "open", url },
+      { name: "type", selector: searchSelector, text: query },
+      { name: "submit", selector: searchSelector },
+    ],
+  };
+}
+
 export function normalizeBrowserUrl(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -196,4 +231,18 @@ function isLoopbackTarget(value: string): boolean {
 
 function matchesAnyPattern(value: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(value));
+}
+
+function trimBrowserCompanionSuffix(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed
+    .replace(/\s+(?:bằng|bang|with|in)\s+browser companion$/i, "")
+    .trim();
+}
+
+function searchFieldSelectorForUrl(_url: string): string {
+  return "textarea[name='q'], input[name='q'], input[type='search'], input[type='text'], textarea";
 }

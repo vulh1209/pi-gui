@@ -76,6 +76,42 @@ function interactiveBrowserPageUrl(): string {
   return `data:text/html,${encodeURIComponent(html)}`;
 }
 
+function googleLikeSearchPageUrl(): string {
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <title>Search Home</title>
+        <style>
+          body { font-family: sans-serif; padding: 32px; }
+          form { display: flex; gap: 12px; align-items: center; }
+          input { width: 320px; padding: 8px 12px; }
+          button { padding: 8px 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>Search</h1>
+        <form id="search-form">
+          <input id="search-box" name="q" type="search" autocomplete="off" />
+          <button id="search-submit" type="submit">Search</button>
+        </form>
+        <script>
+          const input = document.querySelector('#search-box');
+          const form = document.querySelector('#search-form');
+          input?.addEventListener('input', (event) => {
+            document.title = 'Typed:' + event.target.value;
+          });
+          form?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            document.title = 'Results:' + input.value;
+          });
+        </script>
+      </body>
+    </html>
+  `;
+  return `data:text/html,${encodeURIComponent(html)}`;
+}
+
 test("/browser open opens the visible browser companion and emits browser timeline rows", async () => {
   test.setTimeout(30_000);
   const userDataDir = await makeUserDataDir();
@@ -187,6 +223,36 @@ test("common natural-language browser intents route into the same browser comman
     await submitComposerText(window, "show the browser");
     await expect(window.getByTestId("transcript")).toContainText("show the browser");
     await expectBrowserTitle(window, "Natural Language");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("natural-language browser search opens a search page, types a query, and submits through browser actions", async () => {
+  test.setTimeout(30_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeGitWorkspace("browser-natural-language-search-workspace");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Browser NL search test");
+
+    const searchUrl = googleLikeSearchPageUrl();
+    const query = "browser companion flow";
+
+    await submitComposerText(window, `open ${searchUrl} and search for ${query}`);
+    await approveBrowserAutomation(window);
+    await approveBrowserAutomation(window);
+
+    await expectBrowserTitle(window, `Results:${query}`);
+    await expect(window.getByLabel("Browser address")).toHaveValue(searchUrl);
+    await expectTranscriptToContainToolLabel(window, "Open browser companion");
+    await expectTranscriptToContainToolLabel(window, "Type in browser companion element");
+    await expectTranscriptToContainToolLabel(window, "Submit browser companion form");
   } finally {
     await harness.close();
   }
