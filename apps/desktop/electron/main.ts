@@ -19,6 +19,7 @@ import { BrowserProfileRegistry } from "./browser-profile-registry";
 import { BrowserPanelManager } from "./browser-panel-manager";
 import { BrowserAutomationBridge } from "./browser-automation-bridge";
 import { createBrowserRuntimeTools } from "./browser-runtime-tools";
+import { createBrowserRuntimeExtension } from "./browser-runtime-extension";
 import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
@@ -295,11 +296,15 @@ app.whenReady().then(async () => {
     }),
     getRoutingMode: () => store.state.browserWebTaskRoutingMode,
   });
+  const browserRuntimeExtension = createBrowserRuntimeExtension({
+    getRoutingMode: () => store.state.browserWebTaskRoutingMode,
+  });
   store = new DesktopAppStore({
     userDataDir,
     initialWorkspacePaths: resolveInitialWorkspacePaths(),
     browserAutomationBridge,
     customAgentTools: browserRuntimeTools,
+    customAgentExtensionFactories: [browserRuntimeExtension],
     getWindow: () => mainWindow,
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
   });

@@ -1,5 +1,5 @@
 import type { BrowserWindow } from "electron";
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
+import type { ExtensionFactory, ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -126,6 +126,7 @@ export interface DesktopAppStoreOptions {
   readonly initialWorkspacePaths: readonly string[];
   readonly browserAutomationBridge: BrowserAutomationBridge;
   readonly customAgentTools?: readonly ToolDefinition[];
+  readonly customAgentExtensionFactories?: readonly ExtensionFactory[];
   readonly getWindow?: () => BrowserWindow | null;
   readonly generateThreadTitleOverride?: (
     workspace: WorkspaceRef,
@@ -166,6 +167,9 @@ export class DesktopAppStore implements AppStoreInternals {
         ? { generateThreadTitleOverride: options.generateThreadTitleOverride }
         : {}),
       ...(options.customAgentTools ? { customTools: [...options.customAgentTools] } : {}),
+      ...(options.customAgentExtensionFactories
+        ? { extensionFactories: [...options.customAgentExtensionFactories] }
+        : {}),
     };
 
     this.driver = new PiSdkDriver(driverOptions);

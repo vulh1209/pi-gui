@@ -1,8 +1,10 @@
 import { access, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
+  DefaultResourceLoader,
   ModelRegistry,
   SessionManager,
+  type ExtensionFactory,
   type ToolDefinition,
   type AgentSession,
   type AgentSessionEvent,
@@ -74,9 +76,11 @@ import { createAgentSessionWithNpmFallback } from "./npm-package-fallback.js";
 
 export interface PiSdkDriverOptions {
   readonly catalogFilePath?: string;
+  readonly agentDir?: string;
   readonly createAgentSessionImpl?: (options?: CreateAgentSessionOptions) => Promise<{ session: AgentSession }>;
   readonly modelRegistry?: ModelRegistry;
   readonly customTools?: readonly ToolDefinition[];
+  readonly extensionFactories?: readonly ExtensionFactory[];
   readonly generateThreadTitleOverride?: (
     workspace: WorkspaceRef,
     options: import("./thread-title-generator.js").GenerateThreadTitleOptions,
@@ -146,6 +150,8 @@ export class SessionSupervisor {
   private readonly createAgentSessionImpl: (options?: CreateAgentSessionOptions) => Promise<{ session: AgentSession }>;
   private readonly modelRegistry: ModelRegistry | undefined;
   private readonly customTools: readonly ToolDefinition[];
+  private readonly extensionFactories: readonly ExtensionFactory[];
+  private readonly agentDir: string | undefined;
   private readonly records = new Map<string, ManagedSessionRecord>();
 
   constructor(options: PiSdkDriverOptions = {}) {
@@ -155,6 +161,8 @@ export class SessionSupervisor {
     this.createAgentSessionImpl = options.createAgentSessionImpl ?? ((createOptions) => createAgentSessionWithNpmFallback(createOptions));
     this.modelRegistry = options.modelRegistry;
     this.customTools = options.customTools ?? [];
+    this.extensionFactories = options.extensionFactories ?? [];
+    this.agentDir = options.agentDir;
   }
 
   listWorkspaces(): Promise<WorkspaceCatalogSnapshot> {
@@ -303,6 +311,15 @@ export class SessionSupervisor {
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     };
+    if (this.extensionFactories.length > 0) {
+      const resourceLoader = new DefaultResourceLoader({
+        cwd: workspace.path,
+        ...(this.agentDir ? { agentDir: this.agentDir } : {}),
+        extensionFactories: [...this.extensionFactories],
+      });
+      await resourceLoader.reload();
+      createOptions.resourceLoader = resourceLoader;
+    }
     if (initialModel) {
       createOptions.model = initialModel;
     }
@@ -647,12 +664,23 @@ export class SessionSupervisor {
       throw new Error(`Session ${key} cannot be reopened because no session file is tracked.`);
     }
 
-    const { session } = await this.createAgentSessionImpl({
+    const reopenOptions: CreateAgentSessionOptions = {
       cwd: workspace.path,
       sessionManager: SessionManager.open(sessionFile),
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
-    });
+    };
+    if (this.extensionFactories.length > 0) {
+      const resourceLoader = new DefaultResourceLoader({
+        cwd: workspace.path,
+        ...(this.agentDir ? { agentDir: this.agentDir } : {}),
+        extensionFactories: [...this.extensionFactories],
+      });
+      await resourceLoader.reload();
+      reopenOptions.resourceLoader = resourceLoader;
+    }
+
+    const { session } = await this.createAgentSessionImpl(reopenOptions);
 
     const record = existing ?? this.createRecord(workspaceToRef(workspace), session, sessionEntry.title);
     record.session = session;
