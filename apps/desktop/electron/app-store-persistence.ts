@@ -1,5 +1,6 @@
 import type {
   AppView,
+  BrowserWebTaskRoutingMode,
   ExtensionCommandCompatibilityRecord,
   ModelSettingsScopeMode,
   NotificationPreferences,
@@ -12,7 +13,7 @@ import { dirname } from "node:path";
 
 const uiStateWriteQueueByPath = new Map<string, Promise<void>>();
 export interface PersistedUiState {
-  readonly version?: 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  readonly version?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   readonly selectedWorkspaceId?: string;
   readonly selectedSessionId?: string;
   readonly activeView?: AppView;
@@ -25,6 +26,7 @@ export interface PersistedUiState {
   readonly modelSettingsScopeMode?: ModelSettingsScopeMode;
   readonly appGlobalModelSettings?: ModelSettingsSnapshot;
   readonly browserAutomationPolicy?: BrowserAutomationPolicy;
+  readonly browserWebTaskRoutingMode?: BrowserWebTaskRoutingMode;
 }
 
 export interface LegacyPersistedUiState extends PersistedUiState {
@@ -38,7 +40,9 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
     const parsed = JSON.parse(raw) as LegacyPersistedUiState;
     return {
       version:
-        parsed.version === 8
+        parsed.version === 9
+          ? 9
+          : parsed.version === 8
           ? 8
           : parsed.version === 7
             ? 7
@@ -73,6 +77,12 @@ export async function readPersistedUiState(uiStateFilePath: string): Promise<Leg
         parsed.browserAutomationPolicy === "allow-full-automation"
           ? parsed.browserAutomationPolicy
           : undefined,
+      browserWebTaskRoutingMode:
+        parsed.browserWebTaskRoutingMode === "auto" ||
+        parsed.browserWebTaskRoutingMode === "prefer-browser-companion" ||
+        parsed.browserWebTaskRoutingMode === "prefer-runtime-tools"
+          ? parsed.browserWebTaskRoutingMode
+          : undefined,
       composerAttachmentsBySession: parsed.composerAttachmentsBySession,
       transcripts: parsed.transcripts,
     };
@@ -89,7 +99,7 @@ export async function writePersistedUiState(
     await mkdir(dirname(uiStateFilePath), { recursive: true });
     const serialized = `${JSON.stringify(
       {
-        version: 8,
+        version: 9,
         ...payload,
       } satisfies PersistedUiState,
       null,

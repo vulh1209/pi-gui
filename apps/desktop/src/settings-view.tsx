@@ -1,6 +1,6 @@
 import type { RuntimeSettingsSnapshot, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { BrowserAutomationPolicy } from "./browser-panel-state";
-import type { ModelSettingsScopeMode, NotificationPreferences, WorkspaceRecord } from "./desktop-state";
+import type { BrowserWebTaskRoutingMode, ModelSettingsScopeMode, NotificationPreferences, WorkspaceRecord } from "./desktop-state";
 import type { DesktopNotificationPermissionStatus } from "./ipc";
 import { SettingsAppearanceSection } from "./settings-appearance-section";
 import { SettingsGeneralSection } from "./settings-general-section";
@@ -20,9 +20,11 @@ interface SettingsViewProps {
   readonly notificationPermissionPending: boolean;
   readonly modelSettingsScopeMode: ModelSettingsScopeMode;
   readonly browserAutomationPolicy: BrowserAutomationPolicy;
+  readonly browserWebTaskRoutingMode: BrowserWebTaskRoutingMode;
   readonly themeMode: "system" | "light" | "dark";
   readonly onSetModelSettingsScopeMode: (mode: ModelSettingsScopeMode) => void;
   readonly onSetBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) => void;
+  readonly onSetBrowserWebTaskRoutingMode: (mode: BrowserWebTaskRoutingMode) => void;
   readonly onSetDefaultModel: (provider: string, modelId: string) => void;
   readonly onSetThinkingLevel: (thinkingLevel: RuntimeSettingsSnapshot["defaultThinkingLevel"]) => void;
   readonly onToggleSkillCommands: (enabled: boolean) => void;
@@ -46,9 +48,11 @@ export function SettingsView({
   notificationPermissionPending,
   modelSettingsScopeMode,
   browserAutomationPolicy,
+  browserWebTaskRoutingMode,
   themeMode,
   onSetModelSettingsScopeMode,
   onSetBrowserAutomationPolicy,
+  onSetBrowserWebTaskRoutingMode,
   onSetDefaultModel,
   onSetThinkingLevel,
   onToggleSkillCommands,
@@ -100,8 +104,10 @@ export function SettingsView({
               runtime={runtime}
               modelSettingsScopeMode={modelSettingsScopeMode}
               browserAutomationPolicy={browserAutomationPolicy}
+              browserWebTaskRoutingMode={browserWebTaskRoutingMode}
               onSetModelSettingsScopeMode={onSetModelSettingsScopeMode}
               onSetBrowserAutomationPolicy={onSetBrowserAutomationPolicy}
+              onSetBrowserWebTaskRoutingMode={onSetBrowserWebTaskRoutingMode}
               onToggleSkillCommands={onToggleSkillCommands}
             />
           ) : null}

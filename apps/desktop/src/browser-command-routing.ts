@@ -171,15 +171,39 @@ export function parseNaturalLanguageBrowserIntentSequence(
     return undefined;
   }
 
-  const searchSelector = searchFieldSelectorForUrl(url);
-  return {
-    label: `Browser search ${url}`,
-    actions: [
-      { name: "open", url },
-      { name: "type", selector: searchSelector, text: query },
-      { name: "submit", selector: searchSelector },
-    ],
-  };
+  return buildBrowserSearchSequence(url, query);
+}
+
+export function parsePreferredBrowserWebIntent(
+  text: string,
+): BrowserHostActionSequence | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const composite = parseNaturalLanguageBrowserIntentSequence(trimmed);
+  if (composite) {
+    return composite;
+  }
+
+  const googleSearchMatch = trimmed.match(/^(?:tìm|tim|search(?:\s+for)?)\s+(.+?)\s+(?:trên|tren|on)\s+google$/i);
+  const googleQuery = googleSearchMatch?.[1]?.trim();
+  if (googleQuery) {
+    return buildBrowserSearchSequence(COMMON_BROWSER_TARGETS.google ?? "https://www.google.com", googleQuery);
+  }
+
+  const directOpenMatch = trimmed.match(/^(?:mở|mo|open|visit|go to)\s+(?:trang\s+|page\s+|site\s+)?(.+)$/i);
+  const directTarget = directOpenMatch?.[1]?.trim();
+  const directUrl = normalizeBrowserUrl(directTarget);
+  if (directUrl) {
+    return {
+      label: `Browser open ${directUrl}`,
+      actions: [{ name: "open", url: directUrl }],
+    };
+  }
+
+  return undefined;
 }
 
 export function normalizeBrowserUrl(value: string | undefined): string | undefined {
@@ -245,4 +269,16 @@ function trimBrowserCompanionSuffix(value: string | undefined): string | undefin
 
 function searchFieldSelectorForUrl(_url: string): string {
   return "textarea[name='q'], input[name='q'], input[type='search'], input[type='text'], textarea";
+}
+
+function buildBrowserSearchSequence(url: string, query: string): BrowserHostActionSequence {
+  const searchSelector = searchFieldSelectorForUrl(url);
+  return {
+    label: `Browser search ${url}`,
+    actions: [
+      { name: "open", url },
+      { name: "type", selector: searchSelector, text: query },
+      { name: "submit", selector: searchSelector },
+    ],
+  };
 }

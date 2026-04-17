@@ -13,6 +13,7 @@ import {
 import {
   BROWSER_SLASH_USAGE,
   isBrowserSlashCommand,
+  parsePreferredBrowserWebIntent,
   parseNaturalLanguageBrowserIntentSequence,
   parseBrowserSlashCommand,
   parseNaturalLanguageBrowserIntent,
@@ -273,12 +274,20 @@ export async function submitComposer(
   const resolvedRuntimeSlashCommand = runtimeSlashCommand
     ? resolveRuntimeSlashCommand(text, runtime, sessionCommands)
     : undefined;
+  const browserPreferredIntent =
+    attachments.length === 0 && store.state.browserWebTaskRoutingMode === "prefer-browser-companion"
+      ? parsePreferredBrowserWebIntent(text)
+      : undefined;
 
   if (text.startsWith("/") && !runtimeSlashCommand) {
     const handled = await runComposerCommand(store, sessionRef, text);
     if (handled) {
       return handled;
     }
+  }
+
+  if (browserPreferredIntent) {
+    return executeBrowserActionSequence(store, sessionRef, key, browserPreferredIntent.actions, browserPreferredIntent.label);
   }
 
   const naturalLanguageBrowserAction = attachments.length === 0
@@ -288,12 +297,13 @@ export async function submitComposer(
     ? parseNaturalLanguageBrowserIntentSequence(text)
     : undefined;
   if (naturalLanguageBrowserSequence) {
-    for (const action of naturalLanguageBrowserSequence.actions) {
-      await store.runBrowserHostAction(action);
-    }
-    return finishComposerCommand(store, sessionRef, key, naturalLanguageBrowserSequence.label, {
-      appendActivity: false,
-    });
+    return executeBrowserActionSequence(
+      store,
+      sessionRef,
+      key,
+      naturalLanguageBrowserSequence.actions,
+      naturalLanguageBrowserSequence.label,
+    );
   }
   if (naturalLanguageBrowserAction) {
     await store.runBrowserHostAction(naturalLanguageBrowserAction);
@@ -606,6 +616,22 @@ async function runComposerCommand(
   }
 
   return store.withError(`Unsupported slash command: ${commandText}`);
+}
+
+async function executeBrowserActionSequence(
+  store: AppStoreInternals,
+  sessionRef: SessionRef,
+  key: string,
+  actions: readonly import("../src/browser-command-routing").BrowserHostAction[],
+  label: string,
+): Promise<DesktopAppState> {
+  for (const action of actions) {
+    await store.runBrowserHostAction(action);
+  }
+
+  return finishComposerCommand(store, sessionRef, key, label, {
+    appendActivity: false,
+  });
 }
 
 function appendLocalActivity(store: AppStoreInternals, sessionRef: SessionRef, label: string): void {

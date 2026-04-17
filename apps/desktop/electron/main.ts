@@ -374,6 +374,9 @@ app.whenReady().then(async () => {
   ipcMain.handle(desktopIpc.setBrowserAutomationPolicy, (_event, policy: BrowserAutomationPolicy) =>
     store.setBrowserAutomationPolicy(policy),
   );
+  ipcMain.handle(desktopIpc.setBrowserWebTaskRoutingMode, (_event, mode: "auto" | "prefer-browser-companion" | "prefer-runtime-tools") =>
+    store.setBrowserWebTaskRoutingMode(mode),
+  );
   ipcMain.handle(desktopIpc.setBrowserPanelBounds, (_event, bounds: Electron.Rectangle) => {
     browserPanel?.setBounds(bounds);
   });

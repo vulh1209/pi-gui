@@ -228,6 +228,37 @@ test("common natural-language browser intents route into the same browser comman
   }
 });
 
+test("browser-first routing preference prioritizes the browser companion for web-style requests", async () => {
+  test.setTimeout(30_000);
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeGitWorkspace("browser-routing-preference-workspace");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await createNamedThread(window, "Browser routing preference test");
+
+    const preferenceUrl = "data:text/html,<title>Browser%20Preference</title><h1>Preferred</h1>";
+
+    await submitComposerText(window, `open ${preferenceUrl}`);
+    await expect(window.getByTestId("transcript")).toContainText(`open ${preferenceUrl}`);
+    await expect(window.getByTestId("browser-panel")).toHaveCount(0);
+
+    await window.keyboard.press(desktopShortcut(","));
+    await window.getByRole("button", { name: "Prefer browser companion" }).click();
+    await window.getByRole("button", { name: "Back" }).click();
+
+    await submitComposerText(window, `open ${preferenceUrl}`);
+    await expectBrowserTitle(window, "Browser Preference");
+    await expectTranscriptToContainToolLabel(window, "Open browser companion");
+  } finally {
+    await harness.close();
+  }
+});
+
 test("natural-language browser search opens a search page, types a query, and submits through browser actions", async () => {
   test.setTimeout(30_000);
   const userDataDir = await makeUserDataDir();

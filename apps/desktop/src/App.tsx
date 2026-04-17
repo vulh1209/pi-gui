@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
+  type BrowserWebTaskRoutingMode,
   getSelectedSession,
   getSelectedWorkspace,
   type AppView,
@@ -1504,6 +1505,13 @@ export default function App() {
     void updateSnapshot(api, setSnapshot, () => api.setBrowserAutomationPolicy(policy));
   };
 
+  const handleSetBrowserWebTaskRoutingMode = (mode: BrowserWebTaskRoutingMode) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserWebTaskRoutingMode(mode));
+  };
+
   const handleRequestNotificationPermission = () => {
     if (!api?.requestNotificationPermission) {
       return;
@@ -1759,6 +1767,7 @@ export default function App() {
           notificationPermissionPending={notificationPermissionPending}
           modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
           browserAutomationPolicy={snapshot.browserAutomationPolicy}
+          browserWebTaskRoutingMode={snapshot.browserWebTaskRoutingMode}
           themeMode={themeMode}
           onLoginProvider={handleLoginProvider}
           onLogoutProvider={handleLogoutProvider}
@@ -1766,6 +1775,7 @@ export default function App() {
           onRemoveProviderApiKey={handleRemoveProviderApiKey}
           onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
           onSetBrowserAutomationPolicy={handleSetBrowserAutomationPolicy}
+          onSetBrowserWebTaskRoutingMode={handleSetBrowserWebTaskRoutingMode}
           onSetDefaultModel={handleSetDefaultModel}
           onSetNotificationPreferences={handleSetNotificationPreferences}
           onRequestNotificationPermission={handleRequestNotificationPermission}

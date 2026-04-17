@@ -16,6 +16,7 @@ export type WorktreeStatus = "ready" | "missing" | "error";
 export type NewThreadEnvironment = "local" | "worktree";
 export type ThemeMode = "system" | "light" | "dark";
 export type ModelSettingsScopeMode = "app-global" | "per-repo";
+export type BrowserWebTaskRoutingMode = "auto" | "prefer-browser-companion" | "prefer-runtime-tools";
 export type ComposerDraftSyncSource =
   | "state"
   | "selection"
@@ -160,6 +161,7 @@ export interface RemoveWorktreeInput {
 export interface DesktopAppState {
   readonly browserPanel: BrowserPanelState;
   readonly browserAutomationPolicy: BrowserAutomationPolicy;
+  readonly browserWebTaskRoutingMode: BrowserWebTaskRoutingMode;
   readonly browserAutomationConfirmation?: BrowserAutomationConfirmation;
   readonly workspaces: readonly WorkspaceRecord[];
   readonly worktreesByWorkspace: Readonly<Record<string, readonly WorktreeRecord[]>>;
@@ -199,6 +201,7 @@ export function createEmptyDesktopAppState(): DesktopAppState {
   return {
     browserPanel: createHiddenBrowserPanelState(),
     browserAutomationPolicy: "ask-every-time",
+    browserWebTaskRoutingMode: "auto",
     browserAutomationConfirmation: undefined,
     workspaces: [],
     worktreesByWorkspace: {},

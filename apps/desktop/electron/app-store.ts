@@ -37,6 +37,7 @@ import type { BrowserAutomationConfirmation, BrowserAutomationPolicy, BrowserPan
 import type { BrowserHostAction } from "../src/browser-command-routing";
 import {
   type AppView,
+  type BrowserWebTaskRoutingMode,
   type ComposerAttachment,
   type ComposerDraftSyncSource,
   type ExtensionCommandCompatibilityRecord,
@@ -494,6 +495,18 @@ export class DesktopAppStore implements AppStoreInternals {
     return this.emit();
   }
 
+  async setBrowserWebTaskRoutingMode(mode: BrowserWebTaskRoutingMode): Promise<DesktopAppState> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserWebTaskRoutingMode: mode,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
   async setBrowserPanelState(browserPanel: BrowserPanelState): Promise<void> {
     await this.initialize();
     this.state = {
@@ -748,6 +761,7 @@ export class DesktopAppStore implements AppStoreInternals {
         ...this.state,
         activeView: persisted.activeView ?? this.state.activeView,
         browserAutomationPolicy: persisted.browserAutomationPolicy ?? this.state.browserAutomationPolicy,
+        browserWebTaskRoutingMode: persisted.browserWebTaskRoutingMode ?? this.state.browserWebTaskRoutingMode,
         modelSettingsScopeMode: persisted.modelSettingsScopeMode ?? this.state.modelSettingsScopeMode,
         globalModelSettings: persisted.appGlobalModelSettings ?? this.state.globalModelSettings,
         notificationPreferences: {
@@ -1704,6 +1718,7 @@ export class DesktopAppStore implements AppStoreInternals {
       selectedSessionId: this.state.selectedSessionId || undefined,
       activeView: this.state.activeView,
       browserAutomationPolicy: this.state.browserAutomationPolicy,
+      browserWebTaskRoutingMode: this.state.browserWebTaskRoutingMode,
       composerDraft: this.state.composerDraft || undefined,
       composerDraftsBySession: mapToRecord(this.sessionState.composerDraftsBySession),
       extensionCommandCompatibilityByWorkspace: serializeCompatibilityByWorkspace(this.extensionCommandCompatibilityByWorkspace),

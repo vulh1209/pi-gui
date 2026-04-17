@@ -7,6 +7,7 @@ import type {
 } from "@pi-gui/session-driver/types";
 import type {
   AppView,
+  BrowserWebTaskRoutingMode,
   ComposerAttachment,
   ComposerImageAttachment,
   CreateSessionInput,
@@ -56,6 +57,7 @@ export const desktopIpc = {
   setActiveView: "pi-gui:set-active-view",
   setBrowserPanelOpen: "pi-gui:set-browser-panel-open",
   setBrowserAutomationPolicy: "pi-gui:set-browser-automation-policy",
+  setBrowserWebTaskRoutingMode: "pi-gui:set-browser-web-task-routing-mode",
   setBrowserPanelBounds: "pi-gui:set-browser-panel-bounds",
   syncBrowserPanelWorkspace: "pi-gui:sync-browser-panel-workspace",
   navigateBrowserPanel: "pi-gui:navigate-browser-panel",
@@ -175,6 +177,7 @@ export interface PiDesktopApi {
   setActiveView(view: AppView): Promise<DesktopAppState>;
   setBrowserPanelOpen(open: boolean): Promise<DesktopAppState>;
   setBrowserAutomationPolicy(policy: BrowserAutomationPolicy): Promise<DesktopAppState>;
+  setBrowserWebTaskRoutingMode(mode: BrowserWebTaskRoutingMode): Promise<DesktopAppState>;
   setBrowserPanelBounds(bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): Promise<void>;
   syncBrowserPanelWorkspace(workspaceId: string): Promise<void>;
   navigateBrowserPanel(url: string): Promise<void>;
