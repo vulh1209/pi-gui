@@ -78,6 +78,7 @@ import { createAgentSessionWithNpmFallback } from "./npm-package-fallback.js";
 export interface PiSdkDriverOptions {
   readonly catalogFilePath?: string;
   readonly agentDir?: string;
+  readonly additionalExtensionPaths?: readonly string[];
   readonly createAgentSessionImpl?: (options?: CreateAgentSessionOptions) => Promise<{ session: AgentSession }>;
   readonly modelRegistry?: ModelRegistry;
   readonly customTools?: readonly ToolDefinition[];
@@ -154,6 +155,7 @@ export class SessionSupervisor {
   private readonly modelRegistry: ModelRegistry | undefined;
   private readonly customTools: readonly ToolDefinition[];
   private readonly extensionFactories: readonly ExtensionFactory[];
+  private readonly additionalExtensionPaths: readonly string[];
   private readonly eventBus: EventBus | undefined;
   private readonly agentDir: string | undefined;
   private readonly records = new Map<string, ManagedSessionRecord>();
@@ -166,6 +168,7 @@ export class SessionSupervisor {
     this.modelRegistry = options.modelRegistry;
     this.customTools = options.customTools ?? [];
     this.extensionFactories = options.extensionFactories ?? [];
+    this.additionalExtensionPaths = options.additionalExtensionPaths ?? [];
     this.eventBus = options.eventBus;
     this.agentDir = options.agentDir;
   }
@@ -316,11 +319,14 @@ export class SessionSupervisor {
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     };
-    if (this.extensionFactories.length > 0 || this.eventBus) {
+    if (this.extensionFactories.length > 0 || this.additionalExtensionPaths.length > 0 || this.eventBus) {
       const resourceLoader = new DefaultResourceLoader({
         cwd: workspace.path,
         ...(this.agentDir ? { agentDir: this.agentDir } : {}),
         ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+        ...(this.additionalExtensionPaths.length > 0
+          ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+          : {}),
         extensionFactories: [...this.extensionFactories],
       });
       await resourceLoader.reload();
@@ -425,21 +431,6 @@ export class SessionSupervisor {
 
       if (isExtensionCommand) {
         await this.syncRecordAfterSessionMutation(record, { emitUpdate: true });
-      } else if (!isQueuedMessage && runId && record.runningRunId === runId && !session.isStreaming) {
-        record.runningRunId = undefined;
-        record.status = "idle";
-        record.updatedAt = nowIso();
-        record.config = deriveSessionConfig(session.sessionManager);
-        record.sessionCommands = this.collectSessionCommands(session);
-        await this.persistSnapshot(record);
-        await this.emit(record, {
-          type: "runCompleted",
-          sessionRef: record.ref,
-          timestamp: record.updatedAt,
-          runId,
-          snapshot: buildSnapshot(record),
-        });
-        await this.emit(record, sessionUpdatedEvent(record));
       }
     } catch (error) {
       if (isQueuedMessage) {
@@ -691,11 +682,14 @@ export class SessionSupervisor {
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
     };
-    if (this.extensionFactories.length > 0 || this.eventBus) {
+    if (this.extensionFactories.length > 0 || this.additionalExtensionPaths.length > 0 || this.eventBus) {
       const resourceLoader = new DefaultResourceLoader({
         cwd: workspace.path,
         ...(this.agentDir ? { agentDir: this.agentDir } : {}),
         ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+        ...(this.additionalExtensionPaths.length > 0
+          ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+          : {}),
         extensionFactories: [...this.extensionFactories],
       });
       await resourceLoader.reload();
