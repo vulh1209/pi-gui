@@ -62,6 +62,8 @@ export interface SeedAgentDirOptions {
   readonly withOpenAiAuth?: boolean;
   readonly withDefaultModel?: boolean;
   readonly enabledModels?: readonly string[];
+  readonly packages?: readonly string[];
+  readonly npmCommand?: readonly string[];
 }
 
 export interface RealAuthConfig {
@@ -394,6 +396,8 @@ export async function seedAgentDir(agentDir: string, options: SeedAgentDirOption
     withOpenAiAuth = true,
     withDefaultModel = true,
     enabledModels = ["openai/gpt-5", "openai/gpt-4o"],
+    packages = [],
+    npmCommand,
   } = options;
   await mkdir(agentDir, { recursive: true });
   await writeFile(
@@ -416,6 +420,8 @@ export async function seedAgentDir(agentDir: string, options: SeedAgentDirOption
         ...(withDefaultModel ? { defaultProvider: "openai", defaultModel: "gpt-5" } : {}),
         defaultThinkingLevel: "medium",
         enabledModels,
+        ...(packages.length > 0 ? { packages: [...packages] } : {}),
+        ...(npmCommand && npmCommand.length > 0 ? { npmCommand: [...npmCommand] } : {}),
       },
       null,
       2,

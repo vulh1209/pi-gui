@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
 import { randomUUID } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DesktopAppStore } from "./app-store";
@@ -15,6 +16,12 @@ import {
 } from "./notification-permission";
 import { initUpdateChecker } from "./update-checker";
 import { ThemeManager } from "./theme-manager";
+import { BrowserProfileRegistry } from "./browser-profile-registry";
+import { BrowserPanelManager } from "./browser-panel-manager";
+import { BrowserAutomationBridge } from "./browser-automation-bridge";
+import { registerBrowserExtensionHostBridge } from "./browser-extension-host-bridge";
+import { createSimpleEventBus } from "./simple-event-bus";
+import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import type { DesktopAppState, ThemeMode } from "../src/desktop-state";
 import { desktopIpc, getDesktopCommandFromShortcut } from "../src/ipc";
 import { SUPPORTED_COMPOSER_IMAGE_TYPES } from "../src/composer-attachments";
@@ -43,12 +50,87 @@ let stopPublishingSelectedTranscript: (() => void) | undefined;
 let stopNotifications: (() => void) | undefined;
 let stopUpdateChecker: (() => void) | undefined;
 let quittingAfterStoreFlush = false;
+const browserProfiles = new BrowserProfileRegistry();
+let browserPanel: BrowserPanelManager | null = null;
 
 const SUPPORTED_IMAGE_TYPES = SUPPORTED_COMPOSER_IMAGE_TYPES;
 const SUPPORTED_IMAGE_MIME_TYPES = new Set<string>(SUPPORTED_IMAGE_TYPES.map((type) => type.mimeType));
 const OPEN_FOLDER_MENU_ITEM_ID = "file.open-folder";
 const MAX_CLIPBOARD_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CLIPBOARD_IMAGE_DIMENSION = 8_192;
+const configuredUserDataDir = process.env.PI_APP_USER_DATA_DIR?.trim();
+
+if (configuredUserDataDir) {
+  app.setPath("userData", configuredUserDataDir);
+}
+
+function resolveBrowserExtensionPackagePath(): string {
+  const segments = ["packages", "pi-browser-companion-extension"] as const;
+  const searchRoots = [process.cwd(), app.getAppPath(), __dirname];
+
+  for (const root of searchRoots) {
+    let cursor = path.resolve(root);
+    for (let depth = 0; depth < 6; depth += 1) {
+      const candidate = path.resolve(cursor, ...segments);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+      const parent = path.dirname(cursor);
+      if (parent === cursor) {
+        break;
+      }
+      cursor = parent;
+    }
+  }
+
+  return path.resolve(process.cwd(), ...segments);
+}
+
+function resolveAgentDir(userDataDir: string): string {
+  const configuredAgentDir = process.env.PI_CODING_AGENT_DIR?.trim();
+  return configuredAgentDir ? path.resolve(configuredAgentDir) : path.join(app.getPath("home"), ".pi", "agent");
+}
+
+async function ensureBrowserExtensionPackageConfigured(agentDir: string, packagePath: string): Promise<void> {
+  const settingsPath = path.join(agentDir, "settings.json");
+  const normalizedPackagePath = path.resolve(packagePath);
+  let root: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(await readFile(settingsPath, "utf8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      root = { ...parsed } as Record<string, unknown>;
+    }
+  } catch {
+    root = {};
+  }
+
+  const existingPackages = Array.isArray(root.packages) ? [...root.packages] : [];
+  const retainedPackages = existingPackages.filter((entry) => {
+    const source = typeof entry === "string"
+      ? entry
+      : entry && typeof entry === "object" && typeof (entry as { source?: unknown }).source === "string"
+        ? (entry as { source: string }).source
+        : undefined;
+    if (!source || source.includes(":")) {
+      return true;
+    }
+
+    const normalizedSource = path.resolve(source);
+    return normalizedSource !== normalizedPackagePath;
+  });
+
+  retainedPackages.push(normalizedPackagePath);
+
+  const previousSerialized = JSON.stringify(root.packages ?? []);
+  root.packages = retainedPackages;
+  const nextSerialized = JSON.stringify(retainedPackages);
+  if (previousSerialized === nextSerialized && existsSync(settingsPath)) {
+    return;
+  }
+
+  await mkdir(agentDir, { recursive: true });
+  await writeFile(settingsPath, `${JSON.stringify(root, null, 2)}\n`, "utf8");
+}
 
 function readClipboardImageAttachment(): ComposerImageAttachment | null {
   const image = clipboard.readImage();
@@ -241,6 +323,9 @@ app.setName("pi");
 
 app.whenReady().then(async () => {
   const userDataDir = process.env.PI_APP_USER_DATA_DIR?.trim() || app.getPath("userData");
+  const agentDir = resolveAgentDir(userDataDir);
+  const browserExtensionPackagePath = resolveBrowserExtensionPackagePath();
+  await ensureBrowserExtensionPackageConfigured(agentDir, browserExtensionPackagePath);
   let generateThreadTitleOverride:
     | ((workspace: WorkspaceRef, options: GenerateThreadTitleOptions) => Promise<string | null | undefined>)
     | undefined;
@@ -250,13 +335,49 @@ app.whenReady().then(async () => {
         reject: (error: Error) => void;
       }
     | undefined;
+  browserPanel = new BrowserPanelManager(browserProfiles, (state) => store.setBrowserPanelState(state));
+  const browserAutomationBridge = new BrowserAutomationBridge(
+    browserPanel,
+    (sessionRef, item) => store.appendLocalToolActivity(sessionRef, item),
+    () => store.selectedSessionRef(),
+    () => mainWindow,
+    () => store.state.browserAutomationPolicy,
+    (confirmation) => store.setBrowserAutomationConfirmation(confirmation),
+  );
+  const agentEventBus = createSimpleEventBus();
   store = new DesktopAppStore({
     userDataDir,
     initialWorkspacePaths: resolveInitialWorkspacePaths(),
+    eventBus: agentEventBus,
     getWindow: () => mainWindow,
     generateThreadTitleOverride: async (workspace, options) => generateThreadTitleOverride?.(workspace, options),
   });
+  const stopBrowserExtensionHostBridge = registerBrowserExtensionHostBridge({
+    eventBus: agentEventBus,
+    browserAutomationBridge,
+    getRoutingMode: () => store.state.browserWebTaskRoutingMode,
+    resolveSessionRef: ({ cwd, sessionId }) => {
+      const workspace = store.state.workspaces.find((entry) => entry.path === cwd);
+      if (!workspace) {
+        return undefined;
+      }
+
+      const session = workspace.sessions.find((entry) => entry.id === sessionId);
+      if (!session) {
+        return undefined;
+      }
+
+      return {
+        workspaceId: workspace.id,
+        sessionId: session.id,
+      };
+    },
+  });
   await store.initialize();
+  app.once("before-quit", () => {
+    stopBrowserExtensionHostBridge();
+    agentEventBus.clear();
+  });
   installApplicationMenu();
   if (process.env.PI_APP_TEST_MODE) {
     Object.assign(globalThis, {
@@ -343,6 +464,61 @@ app.whenReady().then(async () => {
     store.unarchiveSession(target),
   );
   ipcMain.handle(desktopIpc.setActiveView, (_event, activeView) => store.setActiveView(activeView));
+  ipcMain.handle(desktopIpc.setBrowserPanelOpen, async (_event, open: boolean) => {
+    const nextState = await store.setBrowserPanelOpen(open);
+    if (!open) {
+      await browserPanel?.close();
+    }
+    return nextState;
+  });
+  ipcMain.handle(desktopIpc.setBrowserAutomationPolicy, (_event, policy: BrowserAutomationPolicy) =>
+    store.setBrowserAutomationPolicy(policy),
+  );
+  ipcMain.handle(desktopIpc.setBrowserWebTaskRoutingMode, (_event, mode: "auto" | "prefer-browser-companion" | "prefer-runtime-tools") =>
+    store.setBrowserWebTaskRoutingMode(mode),
+  );
+  ipcMain.handle(desktopIpc.setBrowserPanelBounds, (_event, bounds: Electron.Rectangle) => {
+    browserPanel?.setBounds(bounds);
+  });
+  ipcMain.handle(desktopIpc.syncBrowserPanelWorkspace, async (_event, workspaceId: string) => {
+    if (!mainWindow || !browserPanel) {
+      return;
+    }
+    const state = await store.getState();
+    if (state.browserPanel.mode === "hidden") {
+      return;
+    }
+    if (!browserPanel.hasView() && !state.browserPanel.url) {
+      return;
+    }
+    const bounds = browserPanel.getBounds();
+    if (!bounds) {
+      return;
+    }
+    await browserPanel.syncWorkspace(mainWindow, workspaceId, bounds);
+  });
+  ipcMain.handle(desktopIpc.navigateBrowserPanel, async (_event, url: string) => {
+    const state = await store.getState();
+    const workspaceId = state.selectedWorkspaceId;
+    if (!mainWindow || !browserPanel || !workspaceId) {
+      throw new Error("Browser companion requires an active workspace.");
+    }
+    await browserPanel.show(mainWindow, workspaceId);
+    await browserPanel.navigate(url);
+  });
+  ipcMain.handle(desktopIpc.browserPanelBack, () => {
+    browserPanel?.goBack();
+  });
+  ipcMain.handle(desktopIpc.browserPanelForward, () => {
+    browserPanel?.goForward();
+  });
+  ipcMain.handle(desktopIpc.browserPanelReload, () => {
+    browserPanel?.reload();
+  });
+  ipcMain.handle(desktopIpc.respondToBrowserAutomationConfirmation, async (_event, requestId: string, approved: boolean) => {
+    await browserAutomationBridge.respond(requestId, approved);
+    return store.getState();
+  });
   ipcMain.handle(desktopIpc.refreshRuntime, (_event, workspaceId?: string) => store.refreshRuntime(workspaceId));
   ipcMain.handle(desktopIpc.setModelSettingsScopeMode, (_event, mode) => store.setModelSettingsScopeMode(mode));
   ipcMain.handle(desktopIpc.setSessionModel, (_event, workspaceId: string, sessionId: string, provider: string, modelId: string) =>
@@ -539,6 +715,7 @@ app.on("before-quit", (event) => {
   quittingAfterStoreFlush = true;
   void store
     .flushPersistence()
+    .then(() => browserProfiles.flushStorageData())
     .catch(() => undefined)
     .finally(() => {
       app.quit();

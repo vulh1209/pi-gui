@@ -1,0 +1,13 @@
+{
+  "name": "@pi-gui/pi-browser-companion-extension",
+  "version": "0.1.0",
+  "private": true,
+  "keywords": ["pi-package"],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  },
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  }
+}

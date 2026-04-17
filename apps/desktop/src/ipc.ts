@@ -1,4 +1,5 @@
 import type { RuntimeSettingsSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
 import type {
   NavigateSessionTreeOptions,
   NavigateSessionTreeResult,
@@ -6,6 +7,7 @@ import type {
 } from "@pi-gui/session-driver/types";
 import type {
   AppView,
+  BrowserWebTaskRoutingMode,
   ComposerAttachment,
   ComposerImageAttachment,
   CreateSessionInput,
@@ -53,6 +55,16 @@ export const desktopIpc = {
   startThread: "pi-gui:start-thread",
   cancelCurrentRun: "pi-gui:cancel-current-run",
   setActiveView: "pi-gui:set-active-view",
+  setBrowserPanelOpen: "pi-gui:set-browser-panel-open",
+  setBrowserAutomationPolicy: "pi-gui:set-browser-automation-policy",
+  setBrowserWebTaskRoutingMode: "pi-gui:set-browser-web-task-routing-mode",
+  setBrowserPanelBounds: "pi-gui:set-browser-panel-bounds",
+  syncBrowserPanelWorkspace: "pi-gui:sync-browser-panel-workspace",
+  navigateBrowserPanel: "pi-gui:navigate-browser-panel",
+  browserPanelBack: "pi-gui:browser-panel-back",
+  browserPanelForward: "pi-gui:browser-panel-forward",
+  browserPanelReload: "pi-gui:browser-panel-reload",
+  respondToBrowserAutomationConfirmation: "pi-gui:respond-to-browser-automation-confirmation",
   refreshRuntime: "pi-gui:refresh-runtime",
   setModelSettingsScopeMode: "pi-gui:set-model-settings-scope-mode",
   setDefaultModel: "pi-gui:set-default-model",
@@ -163,6 +175,16 @@ export interface PiDesktopApi {
   startThread(input: StartThreadInput): Promise<DesktopAppState>;
   cancelCurrentRun(): Promise<DesktopAppState>;
   setActiveView(view: AppView): Promise<DesktopAppState>;
+  setBrowserPanelOpen(open: boolean): Promise<DesktopAppState>;
+  setBrowserAutomationPolicy(policy: BrowserAutomationPolicy): Promise<DesktopAppState>;
+  setBrowserWebTaskRoutingMode(mode: BrowserWebTaskRoutingMode): Promise<DesktopAppState>;
+  setBrowserPanelBounds(bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): Promise<void>;
+  syncBrowserPanelWorkspace(workspaceId: string): Promise<void>;
+  navigateBrowserPanel(url: string): Promise<void>;
+  browserPanelBack(): Promise<void>;
+  browserPanelForward(): Promise<void>;
+  browserPanelReload(): Promise<void>;
+  respondToBrowserAutomationConfirmation(requestId: string, approved: boolean): Promise<DesktopAppState>;
   refreshRuntime(workspaceId?: string): Promise<DesktopAppState>;
   setModelSettingsScopeMode(mode: ModelSettingsScopeMode): Promise<DesktopAppState>;
   setDefaultModel(workspaceId: string, provider: string, modelId: string): Promise<DesktopAppState>;

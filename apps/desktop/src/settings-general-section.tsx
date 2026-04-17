@@ -1,18 +1,27 @@
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
-import type { ModelSettingsScopeMode } from "./desktop-state";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
+import type { BrowserWebTaskRoutingMode, ModelSettingsScopeMode } from "./desktop-state";
 import { SettingsGroup, SettingsInfoRow, SettingsRow } from "./settings-utils";
 
 interface SettingsGeneralSectionProps {
   readonly runtime?: RuntimeSnapshot;
   readonly modelSettingsScopeMode: ModelSettingsScopeMode;
+  readonly browserAutomationPolicy: BrowserAutomationPolicy;
+  readonly browserWebTaskRoutingMode: BrowserWebTaskRoutingMode;
   readonly onSetModelSettingsScopeMode: (mode: ModelSettingsScopeMode) => void;
+  readonly onSetBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) => void;
+  readonly onSetBrowserWebTaskRoutingMode: (mode: BrowserWebTaskRoutingMode) => void;
   readonly onToggleSkillCommands: (enabled: boolean) => void;
 }
 
 export function SettingsGeneralSection({
   runtime,
   modelSettingsScopeMode,
+  browserAutomationPolicy,
+  browserWebTaskRoutingMode,
   onSetModelSettingsScopeMode,
+  onSetBrowserAutomationPolicy,
+  onSetBrowserWebTaskRoutingMode,
   onToggleSkillCommands,
 }: SettingsGeneralSectionProps) {
   const connectedCount = runtime?.providers.filter((p) => p.hasAuth).length ?? 0;
@@ -52,6 +61,68 @@ export function SettingsGeneralSection({
             type="checkbox"
             onChange={(event) => onToggleSkillCommands(event.target.checked)}
           />
+        </SettingsRow>
+        <SettingsRow
+          title="Browser automation"
+          description="Choose how aggressively agents may act inside the browser companion."
+        >
+          <div className="settings-pill-row">
+            <button
+              className={`settings-pill${browserAutomationPolicy === "ask-every-time" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserAutomationPolicy === "ask-every-time"}
+              onClick={() => onSetBrowserAutomationPolicy("ask-every-time")}
+            >
+              Ask every time
+            </button>
+            <button
+              className={`settings-pill${browserAutomationPolicy === "allow-navigation-read" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserAutomationPolicy === "allow-navigation-read"}
+              onClick={() => onSetBrowserAutomationPolicy("allow-navigation-read")}
+            >
+              Allow navigation/read
+            </button>
+            <button
+              className={`settings-pill${browserAutomationPolicy === "allow-full-automation" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserAutomationPolicy === "allow-full-automation"}
+              onClick={() => onSetBrowserAutomationPolicy("allow-full-automation")}
+            >
+              Allow full automation
+            </button>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          title="Web task routing"
+          description="Choose whether web-style requests should prefer the visible browser companion before runtime tools."
+        >
+          <div className="settings-pill-row">
+            <button
+              className={`settings-pill${browserWebTaskRoutingMode === "auto" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserWebTaskRoutingMode === "auto"}
+              onClick={() => onSetBrowserWebTaskRoutingMode("auto")}
+            >
+              Auto
+            </button>
+            <button
+              className={`settings-pill${browserWebTaskRoutingMode === "prefer-browser-companion" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserWebTaskRoutingMode === "prefer-browser-companion"}
+              onClick={() => onSetBrowserWebTaskRoutingMode("prefer-browser-companion")}
+            >
+              Prefer browser companion
+            </button>
+            <button
+              className={`settings-pill${browserWebTaskRoutingMode === "prefer-runtime-tools" ? " settings-pill--active" : ""}`}
+              type="button"
+              aria-pressed={browserWebTaskRoutingMode === "prefer-runtime-tools"}
+              onClick={() => onSetBrowserWebTaskRoutingMode("prefer-runtime-tools")}
+            >
+              Prefer runtime tools
+            </button>
+          </div>
         </SettingsRow>
       </SettingsGroup>
 

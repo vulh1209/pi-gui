@@ -3,14 +3,15 @@ import type { CreateSessionOptions, SessionConfig, SessionRef, SessionSnapshot, 
 import type { RuntimeCommandRecord, RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type {
   AppView,
+  DesktopAppState,
   ComposerAttachment,
   ComposerDraftSyncSource,
-  DesktopAppState,
   ExtensionCommandCompatibilityRecord,
   QueuedComposerMessage,
   TranscriptMessage,
   WorkspaceSessionTarget,
 } from "../src/desktop-state";
+import type { BrowserAutomationConfirmation } from "../src/browser-panel-state";
 import type { PendingAutoTitle, QueuedComposerEditState, SessionStateMap } from "./session-state-map";
 import type { GitWorktreeManager } from "./worktree-manager";
 import type { JsonFileStore } from "./json-file-store";
@@ -50,6 +51,8 @@ export interface AppStoreInternals {
   ensureSessionSubscription(sessionRef: SessionRef): Promise<void>;
   ensureSessionSubscribed(sessionRef: SessionRef): Promise<void>;
   refreshSessionCommandsFor(sessionRef: SessionRef): Promise<void>;
+  appendLocalToolActivity(sessionRef: SessionRef, item: TranscriptMessage): void;
+  setBrowserAutomationConfirmation(confirmation: BrowserAutomationConfirmation | undefined): Promise<void>;
   getLearnedRuntimeCommandCompatibility(
     workspaceId: string,
     command: RuntimeCommandRecord,

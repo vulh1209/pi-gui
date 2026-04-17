@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
+  type BrowserWebTaskRoutingMode,
   getSelectedSession,
   getSelectedWorkspace,
   type AppView,
@@ -16,6 +17,7 @@ import {
 } from "./desktop-state";
 import { formatRelativeTime } from "./string-utils";
 import { ComposerPanel } from "./composer-panel";
+import { BrowserAutomationDialog, BrowserPanel } from "./browser-panel";
 import { DiffPanel } from "./diff-panel";
 import { buildModelOptions } from "./composer-commands";
 import { parseTreeComposerCommand } from "./composer-commands";
@@ -35,6 +37,7 @@ import { buildThreadGroups } from "./thread-groups";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { ConversationTimeline } from "./conversation-timeline";
+import type { BrowserAutomationPolicy } from "./browser-panel-state";
 import { useSlashMenu } from "./hooks/use-slash-menu";
 import { useMentionMenu } from "./hooks/use-mention-menu";
 import { useThreadSearch } from "./hooks/use-thread-search";
@@ -172,6 +175,9 @@ export default function App() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const newThreadComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const timelinePaneRef = useRef<HTMLDivElement | null>(null);
+  const browserViewportRef = useRef<HTMLDivElement | null>(null);
+  const browserViewportResizeObserverRef = useRef<ResizeObserver | null>(null);
+  const browserViewportResizeHandlerRef = useRef<(() => void) | null>(null);
   const lastTranscriptMarkerRef = useRef("");
   const pinnedToBottomRef = useRef(true);
   const previousTimelinePaneSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -358,6 +364,8 @@ export default function App() {
   const activeExtensionDialog = selectedExtensionUi?.pendingDialogs[0];
   const isSelectedExtensionDockExpanded = dockExpandedBySession[selectedSessionKey] ?? false;
   const persistedComposerDraft = snapshot?.composerDraft ?? "";
+  const showBrowserPanel = snapshot ? snapshot.browserPanel.mode !== "hidden" : false;
+  const browserAutomationConfirmation = snapshot?.browserAutomationConfirmation;
   const threadGroups = useMemo(
     () => (snapshot ? buildThreadGroups(snapshot) : []),
     [snapshot?.workspaces, snapshot?.worktreesByWorkspace, snapshot?.workspaceOrder],
@@ -482,6 +490,86 @@ export default function App() {
 
     schedulePinnedBottomRealignment(3);
   }, [schedulePinnedBottomRealignment]);
+
+  const toggleBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    const pane = timelinePaneRef.current;
+    const shouldPreserveBottom = pane ? isNearBottom(pane) || pinnedToBottomRef.current : pinnedToBottomRef.current;
+    if (shouldPreserveBottom) {
+      preserveBottomOnNextPaneResizeRef.current = true;
+    }
+
+    const nextOpen = !showBrowserPanel;
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserPanelOpen(nextOpen)).then(() => {
+      if (!nextOpen) {
+        focusComposer();
+      }
+      if (shouldPreserveBottom) {
+        schedulePinnedBottomRealignment(3);
+      }
+    });
+  }, [api, focusComposer, schedulePinnedBottomRealignment, showBrowserPanel]);
+
+  const navigateBrowserPanel = useCallback((url: string) => {
+    if (!api) {
+      return;
+    }
+    void api.navigateBrowserPanel(url);
+  }, [api]);
+
+  const goBackBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void api.browserPanelBack();
+  }, [api]);
+
+  const goForwardBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void api.browserPanelForward();
+  }, [api]);
+
+  const reloadBrowserPanel = useCallback(() => {
+    if (!api) {
+      return;
+    }
+    void api.browserPanelReload();
+  }, [api]);
+
+  const publishBrowserPanelBounds = useCallback((node: HTMLDivElement | null) => {
+    browserViewportResizeObserverRef.current?.disconnect();
+    browserViewportResizeObserverRef.current = null;
+    if (browserViewportResizeHandlerRef.current) {
+      window.removeEventListener("resize", browserViewportResizeHandlerRef.current);
+      browserViewportResizeHandlerRef.current = null;
+    }
+
+    browserViewportRef.current = node;
+    if (!node || !api) {
+      return;
+    }
+
+    const sendBounds = () => {
+      const rect = node.getBoundingClientRect();
+      void api.setBrowserPanelBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      });
+    };
+
+    sendBounds();
+    const observer = new ResizeObserver(() => sendBounds());
+    observer.observe(node);
+    browserViewportResizeObserverRef.current = observer;
+    browserViewportResizeHandlerRef.current = sendBounds;
+    window.addEventListener("resize", sendBounds);
+  }, [api]);
 
   const openSettings = (workspaceId?: string, section?: SettingsSection) => {
     if (!api) {
@@ -756,6 +844,31 @@ export default function App() {
     setNewThreadRootWorkspaceId(nextRootWorkspaceId);
     setPendingNewThreadWorkspaceId("");
   }, [pendingNewThreadWorkspaceId, rootWorkspaceOptions, snapshot]);
+
+  useEffect(() => {
+    if (!api || !showBrowserPanel || !selectedWorkspace || !snapshot || !browserViewportRef.current) {
+      return;
+    }
+
+    const rect = browserViewportRef.current.getBoundingClientRect();
+    void api
+      .setBrowserPanelBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      })
+      .then(() => api.syncBrowserPanelWorkspace(selectedWorkspace.id));
+  }, [api, selectedWorkspace?.id, showBrowserPanel, snapshot]);
+
+  useEffect(() => {
+    return () => {
+      browserViewportResizeObserverRef.current?.disconnect();
+      if (browserViewportResizeHandlerRef.current) {
+        window.removeEventListener("resize", browserViewportResizeHandlerRef.current);
+      }
+    };
+  }, []);
 
   const resetNewThreadSurface = (workspaceId?: string) => {
     const nextWorkspaceId =
@@ -1385,6 +1498,20 @@ export default function App() {
     void updateSnapshot(api, setSnapshot, () => api.setNotificationPreferences(preferences));
   };
 
+  const handleSetBrowserAutomationPolicy = (policy: BrowserAutomationPolicy) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserAutomationPolicy(policy));
+  };
+
+  const handleSetBrowserWebTaskRoutingMode = (mode: BrowserWebTaskRoutingMode) => {
+    if (!api) {
+      return;
+    }
+    void updateSnapshot(api, setSnapshot, () => api.setBrowserWebTaskRoutingMode(mode));
+  };
+
   const handleRequestNotificationPermission = () => {
     if (!api?.requestNotificationPermission) {
       return;
@@ -1434,6 +1561,18 @@ export default function App() {
 
     void updateSnapshot(api, setSnapshot, () =>
       api.respondToHostUiRequest(selectedWorkspace.id, selectedSession.id, response),
+    ).then(() => {
+      focusComposer();
+    });
+  };
+
+  const handleRespondToBrowserAutomationConfirmation = (approved: boolean) => {
+    if (!api || !browserAutomationConfirmation) {
+      return;
+    }
+
+    void updateSnapshot(api, setSnapshot, () =>
+      api.respondToBrowserAutomationConfirmation(browserAutomationConfirmation.requestId, approved),
     ).then(() => {
       focusComposer();
     });
@@ -1627,12 +1766,16 @@ export default function App() {
           notificationPermissionStatus={notificationPermissionStatus}
           notificationPermissionPending={notificationPermissionPending}
           modelSettingsScopeMode={snapshot.modelSettingsScopeMode}
+          browserAutomationPolicy={snapshot.browserAutomationPolicy}
+          browserWebTaskRoutingMode={snapshot.browserWebTaskRoutingMode}
           themeMode={themeMode}
           onLoginProvider={handleLoginProvider}
           onLogoutProvider={handleLogoutProvider}
           onSetProviderApiKey={handleSetProviderApiKey}
           onRemoveProviderApiKey={handleRemoveProviderApiKey}
           onSetModelSettingsScopeMode={handleSetModelSettingsScopeMode}
+          onSetBrowserAutomationPolicy={handleSetBrowserAutomationPolicy}
+          onSetBrowserWebTaskRoutingMode={handleSetBrowserWebTaskRoutingMode}
           onSetDefaultModel={handleSetDefaultModel}
           onSetNotificationPreferences={handleSetNotificationPreferences}
           onRequestNotificationPermission={handleRequestNotificationPermission}
@@ -1760,7 +1903,9 @@ export default function App() {
           setSnapshot={setSnapshot}
           updateSnapshot={updateSnapshot}
           showDiffPanel={showDiffPanel}
+          showBrowserPanel={showBrowserPanel}
           onToggleDiffPanel={toggleDiffPanel}
+          onToggleBrowserPanel={toggleBrowserPanel}
         />
 
         {snapshot.activeView === "new-thread" ? (
@@ -1909,6 +2054,12 @@ export default function App() {
             {activeExtensionDialog ? (
               <ExtensionDialog dialog={activeExtensionDialog} onRespond={handleRespondToExtensionDialog} />
             ) : null}
+            {browserAutomationConfirmation ? (
+              <BrowserAutomationDialog
+                confirmation={browserAutomationConfirmation}
+                onRespond={handleRespondToBrowserAutomationConfirmation}
+              />
+            ) : null}
             {treeModalState.open ? (
               <TreeModal
                 error={treeModalState.error}
@@ -1917,6 +2068,16 @@ export default function App() {
                 tree={treeModalState.tree}
                 onClose={closeTreeModal}
                 onNavigate={navigateTreeSelection}
+              />
+            ) : null}
+            {showBrowserPanel ? (
+              <BrowserPanel
+                panel={snapshot.browserPanel}
+                onNavigate={navigateBrowserPanel}
+                onBack={goBackBrowserPanel}
+                onForward={goForwardBrowserPanel}
+                onReload={reloadBrowserPanel}
+                viewportRef={publishBrowserPanelBounds}
               />
             ) : null}
           </>

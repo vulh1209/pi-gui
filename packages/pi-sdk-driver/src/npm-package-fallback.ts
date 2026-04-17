@@ -1,4 +1,9 @@
 import { DefaultResourceLoader, SettingsManager, createAgentSession, getAgentDir, type CreateAgentSessionOptions } from "@mariozechner/pi-coding-agent";
+import {
+  formatNpmRecoveryWarning,
+  hasNpmPackageSources,
+  retryWithRecoveredNpmCommand,
+} from "./npm-command-recovery.js";
 
 export function isGlobalNpmLookupError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -41,16 +46,28 @@ export async function createAgentSessionWithNpmFallback(options?: CreateAgentSes
     const cwd = options?.cwd ?? process.cwd();
     const agentDir = options?.agentDir ?? getAgentDir();
     const currentSettingsManager = options?.settingsManager ?? SettingsManager.create(cwd, agentDir);
+    if (hasNpmPackageSources(currentSettingsManager)) {
+      const recovered = await retryWithRecoveredNpmCommand({
+        settingsManager: currentSettingsManager,
+        run: (candidateSettingsManager) =>
+          createAgentSession({
+            ...options,
+            cwd,
+            agentDir,
+            settingsManager: candidateSettingsManager,
+          }),
+      });
+      if (recovered.ok) {
+        return recovered.value;
+      }
+
+      console.warn(formatNpmRecoveryWarning("session resource loading", cwd, recovered.failure));
+    }
+
     const fallbackSettingsManager = createSettingsManagerWithoutNpmPackages(currentSettingsManager);
     if (!fallbackSettingsManager) {
       throw error;
     }
-
-    console.warn(
-      `[pi-gui] Falling back to session resource loading without npm package sources for ${cwd}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
 
     const resourceLoader = new DefaultResourceLoader({
       cwd,

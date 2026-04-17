@@ -258,6 +258,8 @@ export async function submitComposer(
     return store.withError("Create or select a session before sending a message.");
   }
 
+  const key = sessionKey(sessionRef);
+
   const runtime = store.runtimeByWorkspace.get(sessionRef.workspaceId);
   const sessionCommands = store.sessionState.sessionCommandsBySession.get(sessionKey(sessionRef)) ?? [];
   const runtimeSlashCommand = hasRuntimeSlashCommand(text, runtime, sessionCommands);
@@ -272,7 +274,6 @@ export async function submitComposer(
     }
   }
 
-  const key = sessionKey(sessionRef);
   const selectedSession = store.sessionFromState(sessionRef);
   const isRunning = selectedSession?.status === "running";
   const editingState = store.getQueuedComposerEditState(sessionRef);
@@ -566,10 +567,15 @@ async function runComposerCommand(
   return store.withError(`Unsupported slash command: ${commandText}`);
 }
 
-function appendLocalActivity(store: AppStoreInternals, sessionRef: SessionRef, label: string): void {
+function appendLocalActivity(
+  store: AppStoreInternals,
+  sessionRef: SessionRef,
+  label: string,
+  detail?: string,
+): void {
   const key = sessionKey(sessionRef);
   const transcript = [...(store.sessionState.transcriptCache.get(key) ?? [])];
-  transcript.push(makeActivityItem(label));
+  transcript.push(makeActivityItem(label, detail ? { detail } : {}));
   store.sessionState.transcriptCache.set(key, transcript);
   store.persistTranscriptCacheForSession(sessionRef);
 }
@@ -579,10 +585,15 @@ function finishComposerCommand(
   sessionRef: SessionRef,
   key: string,
   label: string,
+  options: {
+    readonly appendActivity?: boolean;
+  } = {},
 ): DesktopAppState {
   store.sessionState.composerDraftsBySession.delete(key);
   store.sessionState.composerAttachmentsBySession.delete(key);
-  appendLocalActivity(store, sessionRef, label);
+  if (options.appendActivity ?? true) {
+    appendLocalActivity(store, sessionRef, label);
+  }
   const transcript = store.sessionState.transcriptCache.get(key) ?? [];
   const preview = previewFromTranscript(transcript);
   store.state = {

@@ -1,4 +1,5 @@
 import type { BrowserWindow } from "electron";
+import type { EventBus } from "@mariozechner/pi-coding-agent";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -33,8 +34,10 @@ import type {
   RuntimeSettingsSnapshot,
   RuntimeSnapshot,
 } from "@pi-gui/session-driver/runtime-types";
+import type { BrowserAutomationConfirmation, BrowserAutomationPolicy, BrowserPanelState } from "../src/browser-panel-state";
 import {
   type AppView,
+  type BrowserWebTaskRoutingMode,
   type ComposerAttachment,
   type ComposerDraftSyncSource,
   type ExtensionCommandCompatibilityRecord,
@@ -119,6 +122,7 @@ function isPersistedTranscriptRecord(value: PersistedTranscriptStoreValue): valu
 export interface DesktopAppStoreOptions {
   readonly userDataDir: string;
   readonly initialWorkspacePaths: readonly string[];
+  readonly eventBus?: EventBus;
   readonly getWindow?: () => BrowserWindow | null;
   readonly generateThreadTitleOverride?: (
     workspace: WorkspaceRef,
@@ -157,6 +161,7 @@ export class DesktopAppStore implements AppStoreInternals {
       ...(options.generateThreadTitleOverride
         ? { generateThreadTitleOverride: options.generateThreadTitleOverride }
         : {}),
+      ...(options.eventBus ? { eventBus: options.eventBus } : {}),
     };
 
     this.driver = new PiSdkDriver(driverOptions);
@@ -461,6 +466,55 @@ export class DesktopAppStore implements AppStoreInternals {
     return this.emit();
   }
 
+  async setBrowserPanelOpen(open: boolean): Promise<DesktopAppState> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserPanel: {
+        ...this.state.browserPanel,
+        mode: open ? "open" : "hidden",
+        workspaceId: open ? this.state.selectedWorkspaceId || undefined : this.state.browserPanel.workspaceId,
+      },
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    return this.emit();
+  }
+
+  async setBrowserAutomationPolicy(policy: BrowserAutomationPolicy): Promise<DesktopAppState> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserAutomationPolicy: policy,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
+  async setBrowserWebTaskRoutingMode(mode: BrowserWebTaskRoutingMode): Promise<DesktopAppState> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserWebTaskRoutingMode: mode,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
+  async setBrowserPanelState(browserPanel: BrowserPanelState): Promise<void> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserPanel,
+      revision: this.state.revision + 1,
+    };
+    this.emit();
+  }
+
   async setModelSettingsScopeMode(modelSettingsScopeMode: ModelSettingsScopeMode): Promise<DesktopAppState> {
     await this.initialize();
     if (this.state.modelSettingsScopeMode === modelSettingsScopeMode) {
@@ -704,6 +758,8 @@ export class DesktopAppStore implements AppStoreInternals {
       this.state = {
         ...this.state,
         activeView: persisted.activeView ?? this.state.activeView,
+        browserAutomationPolicy: persisted.browserAutomationPolicy ?? this.state.browserAutomationPolicy,
+        browserWebTaskRoutingMode: persisted.browserWebTaskRoutingMode ?? this.state.browserWebTaskRoutingMode,
         modelSettingsScopeMode: persisted.modelSettingsScopeMode ?? this.state.modelSettingsScopeMode,
         globalModelSettings: persisted.appGlobalModelSettings ?? this.state.globalModelSettings,
         notificationPreferences: {
@@ -1105,6 +1161,27 @@ export class DesktopAppStore implements AppStoreInternals {
 
   async refreshSessionCommandsFor(sessionRef: SessionRef): Promise<void> {
     await this.refreshSessionCommands(sessionRef);
+  }
+
+  appendLocalToolActivity(sessionRef: SessionRef, item: TranscriptMessage): void {
+    const key = sessionKey(sessionRef);
+    const transcript = [...(this.sessionState.transcriptCache.get(key) ?? [])];
+    transcript.push(cloneTranscriptMessage(item));
+    this.sessionState.transcriptCache.set(key, transcript);
+    this.persistTranscriptCacheForSession(sessionRef);
+    this.publishSelectedTranscriptFor(sessionRef);
+  }
+
+  async setBrowserAutomationConfirmation(
+    confirmation: BrowserAutomationConfirmation | undefined,
+  ): Promise<void> {
+    await this.initialize();
+    this.state = {
+      ...this.state,
+      browserAutomationConfirmation: confirmation,
+      revision: this.state.revision + 1,
+    };
+    this.emit();
   }
 
   getLearnedRuntimeCommandCompatibility(
@@ -1629,6 +1706,8 @@ export class DesktopAppStore implements AppStoreInternals {
       selectedWorkspaceId: this.state.selectedWorkspaceId || undefined,
       selectedSessionId: this.state.selectedSessionId || undefined,
       activeView: this.state.activeView,
+      browserAutomationPolicy: this.state.browserAutomationPolicy,
+      browserWebTaskRoutingMode: this.state.browserWebTaskRoutingMode,
       composerDraft: this.state.composerDraft || undefined,
       composerDraftsBySession: mapToRecord(this.sessionState.composerDraftsBySession),
       extensionCommandCompatibilityByWorkspace: serializeCompatibilityByWorkspace(this.extensionCommandCompatibilityByWorkspace),

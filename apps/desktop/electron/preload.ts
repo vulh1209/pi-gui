@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { PRELOAD_DEV_RELOAD_MARKER } from "./dev-reload-preload-probe";
+import type { BrowserAutomationPolicy } from "../src/browser-panel-state";
 import { desktopIpc, type DesktopNotificationPermissionStatus, type PiDesktopCommand } from "../src/ipc";
 import type {
   NavigateSessionTreeOptions,
@@ -131,6 +132,23 @@ contextBridge.exposeInMainWorld("piApp", {
   cancelCurrentRun: () => ipcRenderer.invoke(desktopIpc.cancelCurrentRun) as Promise<DesktopAppState>,
   setActiveView: (view: AppView) =>
     ipcRenderer.invoke(desktopIpc.setActiveView, view) as Promise<DesktopAppState>,
+  setBrowserPanelOpen: (open: boolean) =>
+    ipcRenderer.invoke(desktopIpc.setBrowserPanelOpen, open) as Promise<DesktopAppState>,
+  setBrowserAutomationPolicy: (policy: BrowserAutomationPolicy) =>
+    ipcRenderer.invoke(desktopIpc.setBrowserAutomationPolicy, policy) as Promise<DesktopAppState>,
+  setBrowserWebTaskRoutingMode: (mode: "auto" | "prefer-browser-companion" | "prefer-runtime-tools") =>
+    ipcRenderer.invoke(desktopIpc.setBrowserWebTaskRoutingMode, mode) as Promise<DesktopAppState>,
+  setBrowserPanelBounds: (bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }) =>
+    ipcRenderer.invoke(desktopIpc.setBrowserPanelBounds, bounds) as Promise<void>,
+  syncBrowserPanelWorkspace: (workspaceId: string) =>
+    ipcRenderer.invoke(desktopIpc.syncBrowserPanelWorkspace, workspaceId) as Promise<void>,
+  navigateBrowserPanel: (url: string) =>
+    ipcRenderer.invoke(desktopIpc.navigateBrowserPanel, url) as Promise<void>,
+  browserPanelBack: () => ipcRenderer.invoke(desktopIpc.browserPanelBack) as Promise<void>,
+  browserPanelForward: () => ipcRenderer.invoke(desktopIpc.browserPanelForward) as Promise<void>,
+  browserPanelReload: () => ipcRenderer.invoke(desktopIpc.browserPanelReload) as Promise<void>,
+  respondToBrowserAutomationConfirmation: (requestId: string, approved: boolean) =>
+    ipcRenderer.invoke(desktopIpc.respondToBrowserAutomationConfirmation, requestId, approved) as Promise<DesktopAppState>,
   refreshRuntime: (workspaceId?: string) =>
     ipcRenderer.invoke(desktopIpc.refreshRuntime, workspaceId) as Promise<DesktopAppState>,
   setModelSettingsScopeMode: (mode: "app-global" | "per-repo") =>

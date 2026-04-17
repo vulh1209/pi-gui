@@ -298,3 +298,17 @@ export function DiffIcon() {
     </Icon>
   );
 }
+
+export function BrowserIcon() {
+  return (
+    <Icon>
+      <circle cx="10" cy="10" r="6.4" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M3.9 10h12.2M10 3.6c1.55 1.7 2.35 4 2.35 6.4S11.55 14.7 10 16.4M10 3.6c-1.55 1.7-2.35 4-2.35 6.4S8.45 14.7 10 16.4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.2"
+      />
+    </Icon>
+  );
+}

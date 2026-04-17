@@ -107,6 +107,7 @@ function TimelineToolCallItem({
   readonly onToggle?: (callId: string) => void;
 }) {
   const hasContent = item.input !== undefined || item.output !== undefined;
+  const isBrowserTool = item.toolName === "browser";
   const diffText = isWriteTool(item.toolName) ? extractDiffFromOutput(item.output) : undefined;
   const diffStats = diffText ? countDiffStats(diffText) : undefined;
   const compactLabel = buildCompactLabel(item, diffStats);
@@ -117,7 +118,7 @@ function TimelineToolCallItem({
   };
 
   return (
-    <article className={`timeline-tool timeline-tool--${item.status}`}>
+    <article className={`timeline-tool timeline-tool--${item.status}${isBrowserTool ? " timeline-tool--browser" : ""}`}>
       <button
         className="timeline-tool__header"
         type="button"
@@ -130,7 +131,13 @@ function TimelineToolCallItem({
             <ChevronRightIcon />
           </span>
         ) : null}
-        <span className="timeline-tool__label">{compactLabel}</span>
+        <span className="timeline-tool__summary">
+          {isBrowserTool ? <span className="timeline-tool__eyebrow">Browser action</span> : null}
+          <span className="timeline-tool__label">{compactLabel}</span>
+          {item.detail ? (
+            <span className="timeline-tool__detail-inline" title={item.detail}>{item.detail}</span>
+          ) : null}
+        </span>
         {diffStats ? (
           <span className="timeline-tool__diff-stats">
             <span className="timeline-tool__stat-add">+{diffStats.added}</span>
