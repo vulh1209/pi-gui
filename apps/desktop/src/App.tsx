@@ -3,6 +3,7 @@ import type { SessionTreeSnapshot } from "@pi-gui/session-driver/types";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
   type BrowserWebTaskRoutingMode,
+  type ExtensionCommandVisibility,
   getSelectedSession,
   getSelectedWorkspace,
   type AppView,
@@ -1483,6 +1484,20 @@ export default function App() {
     void api.openExtensionInFinder(extensionsWorkspace.id, filePath);
   };
 
+  const handleSetExtensionVisibilityOverride = (
+    extensionPath: string,
+    commandName: string,
+    visibility: ExtensionCommandVisibility,
+  ) => {
+    void updateSnapshot(api, setSnapshot, () =>
+      api.setExtensionCommandVisibilityOverride({ extensionPath, commandName, visibility }),
+    );
+  };
+
+  const handleClearExtensionVisibilityOverride = (extensionPath: string, commandName: string) => {
+    void updateSnapshot(api, setSnapshot, () => api.clearExtensionCommandVisibilityOverride(extensionPath, commandName));
+  };
+
   const handleTrySkill = (command: string) => {
     void updateSnapshot(api, setSnapshot, () => api.setActiveView("threads"));
     slashMenu.fillComposerFromSlash(command);
@@ -1852,6 +1867,7 @@ export default function App() {
           workspace={extensionsWorkspace}
           runtime={extensionsRuntime}
           commandCompatibility={extensionsCommandCompatibility}
+          visibilityOverrides={snapshot.extensionCommandVisibilityOverrides}
           onOpenExtensionFolder={handleOpenExtensionFolder}
           onRefresh={() => {
             if (!extensionsWorkspace) {
@@ -1860,6 +1876,8 @@ export default function App() {
             void updateSnapshot(api, setSnapshot, () => api.refreshRuntime(extensionsWorkspace.id));
           }}
           onToggleExtension={handleToggleExtension}
+          onSetVisibilityOverride={handleSetExtensionVisibilityOverride}
+          onClearVisibilityOverride={handleClearExtensionVisibilityOverride}
         />
       </SecondarySurface>
     );
