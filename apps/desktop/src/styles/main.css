@@ -411,7 +411,8 @@
 .timeline-tool__header {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  flex-wrap: wrap;
   cursor: pointer;
   background: none;
   border: none;
@@ -444,10 +445,27 @@
   line-height: 1.45;
 }
 
+.timeline-tool__summary {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 1px;
+}
+
+.timeline-tool__detail-inline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .timeline-tool__diff-stats {
   font-family: var(--font-mono);
   font-size: 12px;
-  margin-left: 6px;
+  margin-left: 0;
 }
 
 .timeline-tool__stat-add {
@@ -461,7 +479,7 @@
 .timeline-tool__meta-inline {
   color: var(--muted-soft);
   font-size: 12px;
-  margin-left: 6px;
+  margin-left: auto;
   white-space: nowrap;
 }
 

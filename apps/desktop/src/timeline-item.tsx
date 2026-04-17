@@ -130,7 +130,12 @@ function TimelineToolCallItem({
             <ChevronRightIcon />
           </span>
         ) : null}
-        <span className="timeline-tool__label">{compactLabel}</span>
+        <span className="timeline-tool__summary">
+          <span className="timeline-tool__label">{compactLabel}</span>
+          {item.detail ? (
+            <span className="timeline-tool__detail-inline" title={item.detail}>{item.detail}</span>
+          ) : null}
+        </span>
         {diffStats ? (
           <span className="timeline-tool__diff-stats">
             <span className="timeline-tool__stat-add">+{diffStats.added}</span>

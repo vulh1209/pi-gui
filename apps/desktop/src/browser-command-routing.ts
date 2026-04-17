@@ -19,14 +19,14 @@ const OPEN_IN_BROWSER_PATTERNS = [
 ] as const;
 
 const FOCUS_BROWSER_PATTERNS = [
-  /^(?:focus|show)\s+(?:the\s+)?browser(?: companion)?$/i,
+  /^(?:focus|show)\s+(?:the\s+)?browser companion$/i,
   /^(?:mở|mo)\s+browser companion$/i,
 ] as const;
 
-const BACK_BROWSER_PATTERNS = [/^(?:go back|back)(?:\s+in\s+(?:the\s+)?browser(?: companion)?)?$/i] as const;
-const FORWARD_BROWSER_PATTERNS = [/^(?:go forward|forward)(?:\s+in\s+(?:the\s+)?browser(?: companion)?)?$/i] as const;
+const BACK_BROWSER_PATTERNS = [/^(?:go back|back)\s+in\s+(?:the\s+)?browser(?: companion)?$/i] as const;
+const FORWARD_BROWSER_PATTERNS = [/^(?:go forward|forward)\s+in\s+(?:the\s+)?browser(?: companion)?$/i] as const;
 const RELOAD_BROWSER_PATTERNS = [
-  /^(?:reload|refresh)(?:\s+(?:the\s+)?browser(?: companion)?)?$/i,
+  /^(?:reload|refresh)\s+(?:the\s+)?browser companion$/i,
   /^reload\s+the\s+current\s+browser\s+page$/i,
 ] as const;
 

@@ -1152,6 +1152,11 @@ export class DesktopAppStore implements AppStoreInternals {
   }
 
   async runBrowserHostAction(action: BrowserHostAction): Promise<void> {
+    const sessionRef = this.selectedSessionRef();
+    if (!sessionRef) {
+      throw new Error("Browser companion requires an active session.");
+    }
+    await this.ensureSessionReady(sessionRef);
     await this.browserAutomationBridge.run(action);
   }
 

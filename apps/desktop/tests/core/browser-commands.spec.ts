@@ -43,6 +43,7 @@ test("/browser open opens the visible browser companion and emits browser timeli
     await expectBrowserTitle(window, "Browser Command");
     await expect(window.getByLabel("Browser address")).toHaveValue(openUrl);
     await expectTranscriptToContainToolLabel(window, "Open browser companion");
+    await expect(window.getByTestId("transcript")).toContainText(openUrl);
     await expect(window.locator(".timeline-tool").first()).toBeVisible();
     await expect.poll(async () => (await getBrowserToolLabels(window)).length).toBeGreaterThan(0);
   } finally {
@@ -122,13 +123,17 @@ test("common natural-language browser intents route into the same browser comman
     await window.getByRole("button", { name: "Toggle browser companion" }).click();
     await expect(window.getByTestId("browser-panel")).toHaveCount(0);
 
-    await submitComposerText(window, "show the browser");
+    await submitComposerText(window, "show browser companion");
     await expectBrowserTitle(window, "Natural Language");
     await expectTranscriptToContainToolLabel(window, "Focus browser companion");
 
-    await submitComposerText(window, "reload the browser");
+    await submitComposerText(window, "reload browser companion");
     await expectBrowserTitle(window, "Natural Language");
     await expectTranscriptToContainToolLabel(window, "Reload browser companion");
+
+    await submitComposerText(window, "show the browser");
+    await expect(window.getByTestId("transcript")).toContainText("show the browser");
+    await expectBrowserTitle(window, "Natural Language");
   } finally {
     await harness.close();
   }
