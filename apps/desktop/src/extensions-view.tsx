@@ -159,10 +159,9 @@ export function ExtensionsView({
                         <span className="extension-package-group__title">{group.title}</span>
                         <span className="extension-package-group__count">{group.extensions.length} extensions</span>
                       </span>
-                      <span className="extension-package-group__subtitle">{group.subtitle}</span>
                       <span className="extension-package-group__meta">
-                        <span>{group.sourceLabel}</span>
-                        <span>{group.scopeLabel}</span>
+                        <span className="extension-package-group__meta-pill">{group.sourceLabel}</span>
+                        <span className="extension-package-group__meta-pill">{group.scopeLabel}</span>
                       </span>
                     </span>
                     <span className="extension-package-group__chevron" aria-hidden="true">
