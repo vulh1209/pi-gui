@@ -195,13 +195,23 @@ export function ExtensionsView({
                                   {extension.enabled ? "Enabled" : "Disabled"}
                                   </span>
                                 </span>
-                                <span className="extension-row__summary">{describeExtensionRow(extension)}</span>
+                              <span className="extension-row__summary">{describeExtensionRow(extension)}</span>
                               </span>
                               <span className="extension-row__meta">
-                                <span>{extension.surfaces.length > 0 ? `${extension.surfaces.length} surfaces` : "No native surface"}</span>
-                                {extension.commands.length > 0 ? <span>{extension.commands.length} commands</span> : null}
-                                {extension.tools.length > 0 ? <span>{extension.tools.length} tools</span> : null}
-                                {extension.diagnostics.length > 0 ? <span>{extension.diagnostics.length} issues</span> : null}
+                                <span className="extension-row__meta-pill">
+                                  {extension.surfaces.length > 0 ? `${extension.surfaces.length} surfaces` : "No native surface"}
+                                </span>
+                                {extension.commands.length > 0 ? (
+                                  <span className="extension-row__meta-pill">{extension.commands.length} commands</span>
+                                ) : null}
+                                {extension.tools.length > 0 ? (
+                                  <span className="extension-row__meta-pill">{extension.tools.length} tools</span>
+                                ) : null}
+                                {extension.diagnostics.length > 0 ? (
+                                  <span className="extension-row__meta-pill extension-row__meta-pill--warning">
+                                    {extension.diagnostics.length} issues
+                                  </span>
+                                ) : null}
                               </span>
                               <span className="extension-row__chevron" aria-hidden="true">
                                 {rowExpanded ? "−" : "+"}
