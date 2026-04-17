@@ -52,9 +52,12 @@ export function ExtensionsSurface({
   const selectedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0] ?? "overview";
 
   return (
-    <div className="extension-inline-surface">
-
-      <div className="extension-detail__tokens" role="tablist" aria-label={`${extension.displayName} details tabs`}>
+    <div className="extension-inline-surface skill-detail">
+      <div
+        className="extension-detail__tokens extension-inline-surface__tabs"
+        role="tablist"
+        aria-label={`${extension.displayName} details tabs`}
+      >
         {availableTabs.map((tab) => (
           <button
             aria-selected={selectedTab === tab}
@@ -107,7 +110,7 @@ function OverviewTab({
       <div>
         <div className="skill-detail__meta-label">{extension.displayName}</div>
         <div className="skill-detail__description">{extension.sourceInfo.source}</div>
-        <div className="extension-detail__tokens">
+        <div className="extension-detail__tokens extension-inline-surface__summary-pills">
           <span className={`slash-menu__skill-badge ${extension.enabled ? "" : "slash-menu__skill-badge--warning"}`}>
             {extension.enabled ? "Enabled" : "Disabled"}
           </span>
@@ -123,12 +126,12 @@ function OverviewTab({
         <div className="skill-detail__path">{extension.path}</div>
       </div>
       <div>
-        <div className="skill-detail__actions">
-          <button className="button button--secondary" type="button" onClick={() => onOpenExtensionFolder(extension.path)}>
+        <div className="skill-detail__actions extension-inline-surface__actions">
+          <button className="button button--secondary extension-inline-surface__action" type="button" onClick={() => onOpenExtensionFolder(extension.path)}>
             Open folder
           </button>
           <button
-            className="button button--secondary"
+            className="button button--secondary extension-inline-surface__action"
             type="button"
             onClick={() => onToggleExtension(extension.path, !extension.enabled)}
           >
@@ -139,7 +142,7 @@ function OverviewTab({
       <div>
         <div className="skill-detail__meta-label">Surfaces</div>
         {extension.surfaces.length > 0 ? (
-          <div className="extension-detail__tokens">
+          <div className="extension-detail__tokens extension-inline-surface__summary-pills">
             {extension.surfaces.map((surface) => (
               <span className="slash-menu__skill-badge" key={surface.id}>
                 {surface.title} · {surface.kind}
@@ -209,7 +212,7 @@ function ExtensionSurfacePanel({
             <div className="skill-detail__meta-label">{field.label}</div>
             {field.description ? <div className="skill-detail__description">{field.description}</div> : null}
             {field.kind === "enum" ? (
-              <div className="extension-detail__tokens">
+              <div className="extension-detail__tokens extension-inline-surface__control-row">
                 {field.options.map((option) => (
                   <button
                     className={`button button--secondary ${option.value === field.value ? "button--primary" : ""}`}
@@ -222,7 +225,7 @@ function ExtensionSurfacePanel({
                 ))}
               </div>
             ) : (
-              <div className="extension-detail__tokens">
+              <div className="extension-detail__tokens extension-inline-surface__control-row">
                 <button
                   className={`button button--secondary ${field.value ? "button--primary" : ""}`}
                   type="button"
@@ -281,7 +284,7 @@ function CommandsTab({
           <div className="extension-inline-command" key={command.name}>
             <div className="skill-detail__meta-label">/{command.name}</div>
             <div className="skill-detail__description">{command.description ?? "No description provided."}</div>
-            <div className="extension-detail__tokens">
+            <div className="extension-detail__tokens extension-inline-surface__summary-pills">
               <span className="slash-menu__skill-badge">Default · {formatVisibilityLabel(authorDefault)}</span>
               <span className="slash-menu__skill-badge">Effective · {formatVisibilityLabel(effectiveVisibility)}</span>
               {override ? (
@@ -295,7 +298,7 @@ function CommandsTab({
                 </span>
               ) : null}
             </div>
-            <div className="extension-detail__tokens">
+            <div className="extension-detail__tokens extension-inline-surface__control-row">
               {(["chat", "extensions-page", "hidden"] as const).map((visibility) => (
                 <button
                   className={`button button--secondary ${effectiveVisibility === visibility ? "button--primary" : ""}`}

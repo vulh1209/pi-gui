@@ -2770,6 +2770,34 @@
   padding: 2px 0 2px;
 }
 
+.extension-inline-surface.skill-detail {
+  position: static;
+  gap: 12px;
+}
+
+.extension-inline-surface__tabs {
+  align-items: center;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #edf0f6;
+}
+
+.extension-inline-surface__summary-pills {
+  gap: 6px;
+}
+
+.extension-inline-surface__actions {
+  gap: 6px;
+}
+
+.extension-inline-surface__action {
+  min-height: 30px;
+  padding: 5px 10px;
+}
+
+.extension-inline-surface__control-row {
+  gap: 6px;
+}
+
 .extension-inline-stack {
   display: grid;
   gap: 8px;
