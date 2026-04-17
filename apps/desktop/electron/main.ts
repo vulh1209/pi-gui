@@ -8,6 +8,7 @@ import { DesktopAppStore } from "./app-store";
 import { getChangedFiles, getFileDiff, stageFile } from "./app-store-diff";
 import { listWorkspaceFiles } from "./app-store-files";
 import { MAIN_DEV_RELOAD_MARKER } from "./dev-reload-main-probe";
+import { installDesktopDevtoolsIfPossible } from "./devtools-installer";
 import { NotificationManager } from "./notification-manager";
 import {
   getNotificationPermissionStatus,
@@ -698,12 +699,18 @@ app.whenReady().then(async () => {
   mainWindow = createWindow();
   themeManager.setWindow(mainWindow);
   attachStatePublisher(mainWindow);
+  if (isDev) {
+    void installDesktopDevtoolsIfPossible();
+  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createWindow();
       themeManager.setWindow(mainWindow);
       attachStatePublisher(mainWindow);
+      if (isDev) {
+        void installDesktopDevtoolsIfPossible();
+      }
     }
   });
 });
