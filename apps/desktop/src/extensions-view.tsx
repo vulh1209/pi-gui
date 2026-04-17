@@ -132,7 +132,7 @@ export function ExtensionsView({
           />
         </div>
 
-        <div className="skill-detail" data-testid="extensions-accordion">
+        <div className="extensions-accordion" data-testid="extensions-accordion">
           {packageGroups.length === 0 ? (
             <ExtensionsEmptyState message="Refresh runtime discovery to load workspace and user-level extensions." />
           ) : (
@@ -166,7 +166,7 @@ export function ExtensionsView({
                   </button>
 
                   {groupExpanded ? (
-                    <div className="skill-detail__meta-list">
+                    <div className="skill-detail__meta-list" data-testid="extensions-list">
                       {group.extensions.map((extension) => {
                         const rowExpanded = expandedExtensionPath === extension.path;
                         const extensionCompatibilityRecords = commandCompatibility

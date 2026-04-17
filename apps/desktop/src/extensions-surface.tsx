@@ -52,29 +52,7 @@ export function ExtensionsSurface({
   const selectedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0] ?? "overview";
 
   return (
-    <div className="extension-inline-surface">
-      <div className="skill-detail__header">
-        <div>
-          <h2>{extension.displayName}</h2>
-          <div className="skill-detail__slash">{extension.sourceInfo.source}</div>
-        </div>
-        <span className={`skill-detail__status ${extension.enabled ? "skill-detail__status--enabled" : ""}`}>
-          {extension.enabled ? "Enabled" : "Disabled"}
-        </span>
-      </div>
-
-      <div className="skill-detail__actions">
-        <button className="button button--secondary" type="button" onClick={() => onOpenExtensionFolder(extension.path)}>
-          Open folder
-        </button>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => onToggleExtension(extension.path, !extension.enabled)}
-        >
-          {extension.enabled ? "Disable" : "Enable"}
-        </button>
-      </div>
+    <div className="skill-detail extension-inline-surface">
 
       <div className="extension-detail__tokens" role="tablist" aria-label={`${extension.displayName} details tabs`}>
         {availableTabs.map((tab) => (
@@ -91,7 +69,13 @@ export function ExtensionsSurface({
         ))}
       </div>
 
-      {selectedTab === "overview" ? <OverviewTab extension={extension} /> : null}
+      {selectedTab === "overview" ? (
+        <OverviewTab
+          extension={extension}
+          onOpenExtensionFolder={onOpenExtensionFolder}
+          onToggleExtension={onToggleExtension}
+        />
+      ) : null}
       {selectedTab === "configure" ? <ConfigureTab extension={extension} onSetSurfaceField={onSetSurfaceField} /> : null}
       {selectedTab === "commands" ? (
         <CommandsTab
@@ -109,13 +93,47 @@ export function ExtensionsSurface({
   );
 }
 
-function OverviewTab({ extension }: { readonly extension: RuntimeExtensionRecord }) {
+function OverviewTab({
+  extension,
+  onOpenExtensionFolder,
+  onToggleExtension,
+}: {
+  readonly extension: RuntimeExtensionRecord;
+  readonly onOpenExtensionFolder: (filePath: string) => void;
+  readonly onToggleExtension: (filePath: string, enabled: boolean) => void;
+}) {
   return (
     <div className="skill-detail__meta-list">
       <div>
-        <div className="skill-detail__meta-label">Summary</div>
-        <div className="skill-detail__description">
-          {extension.sourceInfo.scope} · {extension.sourceInfo.origin} · {extension.path}
+        <div className="skill-detail__meta-label">{extension.displayName}</div>
+        <div className="skill-detail__description">{extension.sourceInfo.source}</div>
+        <div className="extension-detail__tokens">
+          <span className={`slash-menu__skill-badge ${extension.enabled ? "" : "slash-menu__skill-badge--warning"}`}>
+            {extension.enabled ? "Enabled" : "Disabled"}
+          </span>
+          <span className="slash-menu__skill-badge">{extension.sourceInfo.scope}</span>
+          <span className="slash-menu__skill-badge">{extension.sourceInfo.origin}</span>
+          {extension.surfaces.length > 0 ? (
+            <span className="slash-menu__skill-badge">{extension.surfaces.length} surfaces</span>
+          ) : null}
+        </div>
+      </div>
+      <div>
+        <div className="skill-detail__meta-label">Path</div>
+        <div className="skill-detail__path">{extension.path}</div>
+      </div>
+      <div>
+        <div className="skill-detail__actions">
+          <button className="button button--secondary" type="button" onClick={() => onOpenExtensionFolder(extension.path)}>
+            Open folder
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => onToggleExtension(extension.path, !extension.enabled)}
+          >
+            {extension.enabled ? "Disable" : "Enable"}
+          </button>
         </div>
       </div>
       <div>
@@ -161,12 +179,13 @@ function ConfigureTab({
   return (
     <div className="skill-detail__meta-list">
       {extension.surfaces.map((surface) => (
-        <ExtensionSurfacePanel
-          key={surface.id}
-          extensionPath={extension.path}
-          surface={surface}
-          onSetSurfaceField={onSetSurfaceField}
-        />
+        <div key={surface.id}>
+          <div className="extension-detail__tokens">
+            <span className="slash-menu__skill-badge">{surface.title}</span>
+            <span className="slash-menu__skill-badge">{surface.kind}</span>
+          </div>
+          <ExtensionSurfacePanel extensionPath={extension.path} surface={surface} onSetSurfaceField={onSetSurfaceField} />
+        </div>
       ))}
     </div>
   );
@@ -183,7 +202,6 @@ function ExtensionSurfacePanel({
 }) {
   return (
     <div>
-      <div className="skill-detail__meta-label">{surface.title}</div>
       {surface.description ? <div className="skill-detail__description">{surface.description}</div> : null}
       <div className="skill-detail__meta-list">
         {surface.fields.map((field) => (
@@ -264,10 +282,10 @@ function CommandsTab({
             <div className="skill-detail__meta-label">/{command.name}</div>
             <div className="skill-detail__description">{command.description ?? "No description provided."}</div>
             <div className="extension-detail__tokens">
-              <span className="slash-menu__skill-badge">Author default · {formatVisibilityLabel(authorDefault)}</span>
+              <span className="slash-menu__skill-badge">Default · {formatVisibilityLabel(authorDefault)}</span>
               <span className="slash-menu__skill-badge">Effective · {formatVisibilityLabel(effectiveVisibility)}</span>
               {override ? (
-                <span className="slash-menu__skill-badge">User override · {formatVisibilityLabel(override.visibility)}</span>
+                <span className="slash-menu__skill-badge">Override · {formatVisibilityLabel(override.visibility)}</span>
               ) : null}
               {compatibility ? (
                 <span
@@ -288,9 +306,11 @@ function CommandsTab({
                   {formatVisibilityLabel(visibility)}
                 </button>
               ))}
-              <button className="button button--secondary" type="button" onClick={() => onClearVisibilityOverride(command.name)}>
-                Use author default
-              </button>
+              {override ? (
+                <button className="button button--secondary" type="button" onClick={() => onClearVisibilityOverride(command.name)}>
+                  Use default
+                </button>
+              ) : null}
             </div>
           </div>
         );
