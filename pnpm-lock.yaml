@@ -148,6 +148,15 @@ importers:
         specifier: workspace:*
         version: link:../session-driver
 
+  packages/pi-browser-companion-extension:
+    dependencies:
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.62.0(ws@8.19.0)(zod@4.3.6)
+      '@sinclair/typebox':
+        specifier: '*'
+        version: 0.34.48
+
   packages/pi-sdk-driver:
     dependencies:
       '@mariozechner/pi-coding-agent':

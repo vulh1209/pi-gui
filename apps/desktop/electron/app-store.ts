@@ -124,6 +124,7 @@ function isPersistedTranscriptRecord(value: PersistedTranscriptStoreValue): valu
 export interface DesktopAppStoreOptions {
   readonly userDataDir: string;
   readonly initialWorkspacePaths: readonly string[];
+  readonly additionalExtensionPaths?: readonly string[];
   readonly eventBus?: EventBus;
   readonly getWindow?: () => BrowserWindow | null;
   readonly generateThreadTitleOverride?: (
@@ -160,6 +161,9 @@ export class DesktopAppStore implements AppStoreInternals {
     const catalogFilePath = join(options.userDataDir, "catalogs.json");
     const driverOptions: PiSdkDriverConfig = {
       catalogFilePath,
+      ...(options.additionalExtensionPaths?.length
+        ? { additionalExtensionPaths: [...options.additionalExtensionPaths] }
+        : {}),
       ...(options.generateThreadTitleOverride
         ? { generateThreadTitleOverride: options.generateThreadTitleOverride }
         : {}),

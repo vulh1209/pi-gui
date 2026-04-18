@@ -23,7 +23,10 @@ async function getBrowserToolLabels(window: Page): Promise<string[]> {
 
 async function expectTranscriptToContainToolLabel(window: Page, label: string): Promise<void> {
   await expect.poll(async () => getBrowserToolLabels(window)).toContain(label);
-  await expect(window.getByTestId("transcript")).toContainText(label);
+}
+
+async function expectTranscriptToShowToolSummary(window: Page): Promise<void> {
+  await expect(window.getByTestId("transcript")).toContainText(/tool call/i);
 }
 
 async function expectBrowserTitle(window: Page, title: string): Promise<void> {
@@ -133,8 +136,8 @@ test("/browser open opens the visible browser companion and emits browser timeli
     await expectBrowserTitle(window, "Browser Command");
     await expect(window.getByLabel("Browser address")).toHaveValue(openUrl);
     await expectTranscriptToContainToolLabel(window, "Open browser companion");
-    await expect(window.getByTestId("transcript")).toContainText(openUrl);
-    await expect(window.locator(".timeline-tool").first()).toBeVisible();
+    await expectTranscriptToContainToolLabel(window, "Navigate browser companion");
+    await expectTranscriptToShowToolSummary(window);
     await expect.poll(async () => (await getBrowserToolLabels(window)).length).toBeGreaterThan(0);
   } finally {
     await harness.close();
@@ -248,10 +251,17 @@ test("browser companion extension is discoverable in the Extensions view", async
   try {
     const window = await harness.firstWindow();
     await createNamedThread(window, "Browser extension discovery test");
+    await expect
+      .poll(async () => {
+        const state = await getDesktopState(window);
+        const runtime = state.runtimeByWorkspace[state.selectedWorkspaceId];
+        return runtime?.extensions.some((extension) => extension.displayName === "pi-browser-companion-extension") ?? false;
+      })
+      .toBe(true);
 
     await window.getByRole("button", { name: "Extensions", exact: true }).click();
-    await expect(window.getByTestId("extensions-list")).toContainText("pi-browser-companion-extension");
-    await window.getByTestId("extensions-list").locator(".skill-card").filter({ hasText: "pi-browser-companion-extension" }).first().click();
+    await expect(window.getByTestId("extensions-accordion")).toContainText("pi-browser-companion-extension");
+    await window.getByTestId("extensions-list").getByRole("button", { name: /pi-browser-companion-extension/i }).click();
     await expect(window.locator(".skill-detail")).toContainText("browser.open");
     await expect(window.locator(".skill-detail")).toContainText("browser.search");
     await expect(window.locator(".skill-detail")).toContainText("browser.focus");

@@ -122,6 +122,7 @@ interface LoadedExtensionAdapter {
 
 export interface RuntimeSupervisorOptions {
   readonly agentDir?: string;
+  readonly additionalExtensionPaths?: readonly string[];
   readonly authStorage?: AuthStorage;
   readonly modelRegistry?: ModelRegistry;
   readonly eventBus?: EventBus;
@@ -132,6 +133,7 @@ type ToggleableResourceKind = "extension" | "skill";
 
 export class RuntimeSupervisor implements RuntimeResourceDriver {
   private readonly agentDir: string;
+  private readonly additionalExtensionPaths: readonly string[];
   private readonly authStorage: AuthStorage;
   private readonly modelRegistry: ModelRegistry;
   private readonly eventBus: EventBus | undefined;
@@ -140,6 +142,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
   constructor(options: RuntimeSupervisorOptions = {}) {
     const deps = createRuntimeDependencies(options);
     this.agentDir = deps.agentDir;
+    this.additionalExtensionPaths = options.additionalExtensionPaths ?? [];
     this.authStorage = deps.authStorage;
     this.modelRegistry = deps.modelRegistry;
     this.eventBus = options.eventBus;
@@ -397,6 +400,9 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
       agentDir: this.agentDir,
       settingsManager,
       ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+      ...(this.additionalExtensionPaths.length > 0
+        ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+        : {}),
     });
     try {
       await resourceLoader.reload();
@@ -418,6 +424,9 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
             agentDir: this.agentDir,
             settingsManager: candidateSettingsManager,
             ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+            ...(this.additionalExtensionPaths.length > 0
+              ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+              : {}),
           });
           await candidateResourceLoader.reload();
           return {
@@ -451,6 +460,9 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
           agentDir: this.agentDir,
           settingsManager,
           ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+          ...(this.additionalExtensionPaths.length > 0
+            ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+            : {}),
         });
         await resourceLoader.reload();
       }
@@ -498,7 +510,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
 
   private async resolveRuntimePaths(context: RuntimeContext): Promise<ResolvedPaths> {
     try {
-      return await context.packageManager.resolve();
+      return await this.resolvePathsWithAdditionalExtensions(context.packageManager);
     } catch (error) {
       if (!isGlobalNpmLookupError(error) || !hasNpmPackageSources(context.settingsManager)) {
         throw error;
@@ -517,9 +529,12 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
             agentDir: this.agentDir,
             settingsManager: candidateSettingsManager,
             ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+            ...(this.additionalExtensionPaths.length > 0
+              ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+              : {}),
           });
           await candidateResourceLoader.reload();
-          const resolvedPaths = await candidatePackageManager.resolve();
+          const resolvedPaths = await this.resolvePathsWithAdditionalExtensions(candidatePackageManager);
           return {
             settingsManager: candidateSettingsManager,
             packageManager: candidatePackageManager,
@@ -553,13 +568,46 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         agentDir: this.agentDir,
         settingsManager: fallbackSettingsManager,
         ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+        ...(this.additionalExtensionPaths.length > 0
+          ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+          : {}),
       });
       await fallbackResourceLoader.reload();
       context.settingsManager = fallbackSettingsManager;
       context.packageManager = fallbackPackageManager;
       context.resourceLoader = fallbackResourceLoader;
-      return await fallbackPackageManager.resolve();
+      return await this.resolvePathsWithAdditionalExtensions(fallbackPackageManager);
     }
+  }
+
+  private async resolvePathsWithAdditionalExtensions(packageManager: DefaultPackageManager): Promise<ResolvedPaths> {
+    const resolved = await packageManager.resolve();
+    if (this.additionalExtensionPaths.length === 0) {
+      return resolved;
+    }
+
+    const additional = await packageManager.resolveExtensionSources([...this.additionalExtensionPaths], {
+      temporary: true,
+    });
+    if (additional.extensions.length === 0) {
+      return resolved;
+    }
+
+    const extensions = [...resolved.extensions];
+    const seenPaths = new Set(extensions.map((entry) => resolve(entry.path)));
+    for (const entry of additional.extensions) {
+      const key = resolve(entry.path);
+      if (seenPaths.has(key)) {
+        continue;
+      }
+      seenPaths.add(key);
+      extensions.push(entry);
+    }
+
+    return {
+      ...resolved,
+      extensions,
+    };
   }
 
   private async buildProviderRecords(): Promise<readonly RuntimeProviderRecord[]> {
