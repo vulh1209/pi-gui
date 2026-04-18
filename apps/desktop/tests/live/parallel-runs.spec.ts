@@ -5,6 +5,7 @@ import {
   createNamedThread,
   emitTestSessionEvent,
   getDesktopState,
+  getRealAuthConfig,
   getSelectedTranscript,
   launchDesktop,
   makeUserDataDir,
@@ -198,6 +199,8 @@ test("runs two sessions in parallel without sidebar status bleed", async () => {
 
 test("switches threads promptly while sessions are already running", async () => {
   test.setTimeout(180_000);
+  const realAuth = getRealAuthConfig();
+  test.skip(!realAuth.enabled, realAuth.skipReason);
   const userDataDir = await makeUserDataDir();
   const workspacePath = await makeWorkspace("parallel-switch-workspace");
   const harness = await launchDesktop(userDataDir, {

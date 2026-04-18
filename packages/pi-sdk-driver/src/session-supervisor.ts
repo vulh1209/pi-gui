@@ -4,6 +4,7 @@ import {
   DefaultResourceLoader,
   ModelRegistry,
   SessionManager,
+  SettingsManager,
   type EventBus,
   type ExtensionFactory,
   type ToolDefinition,
@@ -73,7 +74,16 @@ import {
   workspaceToRef,
 } from "./session-supervisor-utils.js";
 import type { SessionTranscriptMessage } from "./transcript.js";
-import { createAgentSessionWithNpmFallback } from "./npm-package-fallback.js";
+import {
+  createAgentSessionWithNpmFallback,
+  createSettingsManagerWithoutNpmPackages,
+  isGlobalNpmLookupError,
+} from "./npm-package-fallback.js";
+import {
+  formatNpmRecoveryWarning,
+  hasNpmPackageSources,
+  retryWithRecoveredNpmCommand,
+} from "./npm-command-recovery.js";
 
 export interface PiSdkDriverOptions {
   readonly catalogFilePath?: string;
@@ -171,6 +181,67 @@ export class SessionSupervisor {
     this.additionalExtensionPaths = options.additionalExtensionPaths ?? [];
     this.eventBus = options.eventBus;
     this.agentDir = options.agentDir;
+  }
+
+  private createSessionResourceLoader(workspacePath: string, settingsManager?: SettingsManager): DefaultResourceLoader {
+    return new DefaultResourceLoader({
+      cwd: workspacePath,
+      ...(this.agentDir ? { agentDir: this.agentDir } : {}),
+      ...(settingsManager ? { settingsManager } : {}),
+      ...(this.eventBus ? { eventBus: this.eventBus } : {}),
+      ...(this.additionalExtensionPaths.length > 0
+        ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
+        : {}),
+      extensionFactories: [...this.extensionFactories],
+    });
+  }
+
+  private async prepareSessionResourceLoading(workspacePath: string): Promise<{
+    readonly resourceLoader?: DefaultResourceLoader;
+    readonly settingsManager?: SettingsManager;
+  }> {
+    if (this.extensionFactories.length === 0 && this.additionalExtensionPaths.length === 0 && !this.eventBus) {
+      return {};
+    }
+
+    const settingsManager = SettingsManager.create(workspacePath, this.agentDir);
+    let resourceLoader = this.createSessionResourceLoader(workspacePath, settingsManager);
+    try {
+      await resourceLoader.reload();
+      return { resourceLoader, settingsManager };
+    } catch (error) {
+      if (!isGlobalNpmLookupError(error) || !hasNpmPackageSources(settingsManager)) {
+        throw error;
+      }
+
+      const recovered = await retryWithRecoveredNpmCommand({
+        settingsManager,
+        run: async (candidateSettingsManager) => {
+          const candidateResourceLoader = this.createSessionResourceLoader(workspacePath, candidateSettingsManager);
+          await candidateResourceLoader.reload();
+          return {
+            resourceLoader: candidateResourceLoader,
+            settingsManager: candidateSettingsManager,
+          };
+        },
+      });
+      if (recovered.ok) {
+        return recovered.value;
+      }
+
+      const fallbackSettingsManager = createSettingsManagerWithoutNpmPackages(settingsManager);
+      if (!fallbackSettingsManager) {
+        throw error;
+      }
+
+      console.warn(formatNpmRecoveryWarning("session resource loading", workspacePath, recovered.failure));
+      resourceLoader = this.createSessionResourceLoader(workspacePath, fallbackSettingsManager);
+      await resourceLoader.reload();
+      return {
+        resourceLoader,
+        settingsManager: fallbackSettingsManager,
+      };
+    }
   }
 
   listWorkspaces(): Promise<WorkspaceCatalogSnapshot> {
@@ -318,20 +389,8 @@ export class SessionSupervisor {
       sessionManager: SessionManager.create(workspace.path),
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
+      ...(await this.prepareSessionResourceLoading(workspace.path)),
     };
-    if (this.extensionFactories.length > 0 || this.additionalExtensionPaths.length > 0 || this.eventBus) {
-      const resourceLoader = new DefaultResourceLoader({
-        cwd: workspace.path,
-        ...(this.agentDir ? { agentDir: this.agentDir } : {}),
-        ...(this.eventBus ? { eventBus: this.eventBus } : {}),
-        ...(this.additionalExtensionPaths.length > 0
-          ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
-          : {}),
-        extensionFactories: [...this.extensionFactories],
-      });
-      await resourceLoader.reload();
-      createOptions.resourceLoader = resourceLoader;
-    }
     if (initialModel) {
       createOptions.model = initialModel;
     }
@@ -681,20 +740,8 @@ export class SessionSupervisor {
       sessionManager: SessionManager.open(sessionFile),
       ...(this.modelRegistry ? { modelRegistry: this.modelRegistry } : {}),
       ...(this.customTools.length > 0 ? { customTools: [...this.customTools] } : {}),
+      ...(await this.prepareSessionResourceLoading(workspace.path)),
     };
-    if (this.extensionFactories.length > 0 || this.additionalExtensionPaths.length > 0 || this.eventBus) {
-      const resourceLoader = new DefaultResourceLoader({
-        cwd: workspace.path,
-        ...(this.agentDir ? { agentDir: this.agentDir } : {}),
-        ...(this.eventBus ? { eventBus: this.eventBus } : {}),
-        ...(this.additionalExtensionPaths.length > 0
-          ? { additionalExtensionPaths: [...this.additionalExtensionPaths] }
-          : {}),
-        extensionFactories: [...this.extensionFactories],
-      });
-      await resourceLoader.reload();
-      reopenOptions.resourceLoader = resourceLoader;
-    }
 
     const { session } = await this.createAgentSessionImpl(reopenOptions);
 

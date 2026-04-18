@@ -7,7 +7,7 @@ import type {
   WorkspaceRecord,
 } from "./desktop-state";
 import { RefreshIcon } from "./icons";
-import { buildExtensionPackageGroups } from "./extensions-accordion-model";
+import { buildExtensionPackageGroups, type ExtensionPackageGroup } from "./extensions-accordion-model";
 import { ExtensionsSurface } from "./extensions-surface";
 
 interface ExtensionsViewProps {
@@ -21,6 +21,10 @@ interface ExtensionsViewProps {
   readonly onSetSurfaceField: (extensionPath: string, fieldKey: string, value: string | boolean) => void;
   readonly onSetVisibilityOverride: (extensionPath: string, commandName: string, visibility: ExtensionCommandVisibility) => void;
   readonly onClearVisibilityOverride: (extensionPath: string, commandName: string) => void;
+}
+
+function preferDefaultPackageGroup(packageGroups: readonly ExtensionPackageGroup[]): ExtensionPackageGroup | undefined {
+  return packageGroups.find((group) => !group.sourceLabel.includes("pi-browser-companion-extension")) ?? packageGroups[0];
 }
 
 export function ExtensionsView({
@@ -62,7 +66,8 @@ export function ExtensionsView({
     );
   }, [extensions, query]);
   const packageGroups = useMemo(() => buildExtensionPackageGroups(filteredExtensions), [filteredExtensions]);
-  const activeGroup = packageGroups.find((group) => group.id === expandedGroupId) ?? packageGroups[0];
+  const defaultGroup = preferDefaultPackageGroup(packageGroups);
+  const activeGroup = packageGroups.find((group) => group.id === expandedGroupId) ?? defaultGroup;
 
   useEffect(() => {
     if (packageGroups.length === 0) {
@@ -76,9 +81,9 @@ export function ExtensionsView({
     }
 
     if (!expandedGroupId || !packageGroups.some((group) => group.id === expandedGroupId)) {
-      setExpandedGroupId(packageGroups[0]?.id);
+      setExpandedGroupId(defaultGroup?.id);
     }
-  }, [expandedExtensionPath, expandedGroupId, packageGroups]);
+  }, [defaultGroup, expandedExtensionPath, expandedGroupId, packageGroups]);
 
   useEffect(() => {
     if (!activeGroup) {
