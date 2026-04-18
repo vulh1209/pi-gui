@@ -8,8 +8,9 @@
   "main": "out/main/main.js",
   "scripts": {
     "build:deps": "pnpm --dir ../.. --filter @pi-gui/session-driver --filter @pi-gui/pi-sdk-driver --filter @pi-gui/catalogs run build",
+    "build:memory-helper": "node scripts/sync-memory-helper.mjs",
     "dev": "node scripts/dev.mjs",
-    "build": "pnpm run build:deps && electron-vite build",
+    "build": "pnpm run build:deps && pnpm run build:memory-helper && electron-vite build",
     "storybook": "storybook dev -p 6006 -c .storybook",
     "storybook:build": "storybook build -c .storybook -o storybook-static",
     "preview": "pnpm run build:deps && electron-vite preview",
@@ -52,6 +53,7 @@
     "test:native:paste": "pnpm build && cross-env PI_APP_TEST_MODE=foreground pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/native/paste.spec.ts",
     "test:native:attach-image": "pnpm build && cross-env PI_APP_TEST_MODE=foreground pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/native/attach-image.spec.ts",
     "test:prod:real-auth-contract": "pnpm build && cross-env PI_APP_TEST_MODE=background pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/production/real-auth-contract.spec.ts",
+    "test:prod:memory-helper-env": "pnpm run package:dir && cross-env PI_APP_TEST_MODE=background pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/production/memory-helper-env.spec.ts",
     "test:prod:packaged-smoke": "pnpm run package:dir && cross-env PI_APP_TEST_MODE=background pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/production/packaged-smoke.spec.ts",
     "test:prod:notification-settings": "pnpm run package:dir && cross-env PI_APP_TEST_MODE=background pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/production/notification-settings-packaged.spec.ts",
     "test:prod:applications-relaunch": "pnpm run package && cross-env PI_APP_TEST_MODE=background pnpm --dir ../.. exec playwright test -c apps/desktop/playwright.config.ts apps/desktop/tests/production/applications-relaunch.spec.ts",

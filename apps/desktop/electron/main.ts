@@ -7,6 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DesktopAppStore } from "./app-store";
 import { getChangedFiles, getFileDiff, stageFile } from "./app-store-diff";
+import { applyMemoryHelperEnv } from "./memory-helper-runtime";
 import { listWorkspaceFiles } from "./app-store-files";
 import { MAIN_DEV_RELOAD_MARKER } from "./dev-reload-main-probe";
 import { installDesktopDevtoolsIfPossible } from "./devtools-installer";
@@ -359,6 +360,7 @@ app.setName("pi");
 
 app.whenReady().then(async () => {
   const userDataDir = process.env.PI_APP_USER_DATA_DIR?.trim() || app.getPath("userData");
+  applyMemoryHelperEnv();
   const browserExtensionPackagePath = resolveBrowserExtensionPackagePath();
   await scrubBrowserCompanionFromAgentSettings(browserExtensionPackagePath);
   let generateThreadTitleOverride:

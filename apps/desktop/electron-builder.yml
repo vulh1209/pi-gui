@@ -16,6 +16,10 @@ asarUnpack:
   - "**/*.node"
   - "**/*.wasm"
 
+extraResources:
+  - from: resources/memory-helper
+    to: memory-helper
+
 mac:
   category: public.app-category.developer-tools
   hardenedRuntime: true
